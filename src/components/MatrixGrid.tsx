@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { todayStr } from '../utils/date';
-import { shortExtraAmount, formatExtraAmount } from '../utils/amount';
+import { shortExtraAmount, formatExtraAmount, allowsCustomAmount } from '../utils/amount';
 import { AmountEntry } from './AmountEntry';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { calculateMonthSummary } from '../utils/analytics';
@@ -380,7 +380,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
   // Render cell content: core symbol/value plus any custom count/minutes underneath
   const renderCellContent = (habit: Habit, day: number) => {
     const log = logMap.get(`${habit.id}:${currentMonth}-${String(day).padStart(2, '0')}`);
-    const extra = shortExtraAmount(log);
+    const extra = allowsCustomAmount(habit, sections) ? shortExtraAmount(log) : undefined;
     const core = renderCellCore(habit, day);
     if (!extra) return core;
     return (
@@ -2486,7 +2486,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
           )}
 
           {/* Custom count / minutes (pages & minutes habits already have a typed field above) */}
-          {selectedCell.habit.inputType !== 'QUANTITY' && selectedCell.habit.inputType !== 'DURATION' && (
+          {selectedCell.habit.inputType !== 'QUANTITY' && selectedCell.habit.inputType !== 'DURATION' && allowsCustomAmount(selectedCell.habit, sections) && (
             <AmountEntry
               variant="inline"
               habit={selectedCell.habit}

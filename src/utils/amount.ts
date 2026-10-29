@@ -1,4 +1,4 @@
-import { Habit, HabitLog } from '../types';
+import { Habit, HabitLog, HabitSection } from '../types';
 
 /**
  * Custom amounts ("how many" / "how long") for any habit.
@@ -106,4 +106,13 @@ export function shortExtraAmount(log?: HabitLog): string | undefined {
 export function formatExtraAmount(log?: HabitLog): string | undefined {
   if (!log?.amount) return undefined;
   return `${log.amount.toLocaleString()} ${log.amountUnit === 'min' ? 'min' : 'count'}`;
+}
+
+/** Sections whose habits never take a custom count/minutes (prayers are logged by state or done). */
+const PRAYER_SECTION_RE = /prayer|namaz|نماز/i;
+
+export function allowsCustomAmount(habit: Habit, sections: HabitSection[]): boolean {
+  const section = sections.find(s => s.id === habit.sectionId);
+  if (!section) return true;
+  return !(PRAYER_SECTION_RE.test(section.title) || PRAYER_SECTION_RE.test(section.urduTitle ?? ''));
 }

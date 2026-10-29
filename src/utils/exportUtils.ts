@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { calculateMonthSummary } from './analytics';
 import { getHijriDate } from './hijri';
+import { allowsCustomAmount } from './amount';
 
 export function downloadExcel(
   template: TrackerTemplate,
@@ -70,7 +71,7 @@ export function downloadExcel(
         }
 
         // Append any custom count / minutes entered for status habits, e.g. "✓ 25m"
-        if (log?.amount) {
+        if (log?.amount && allowsCustomAmount(h, sections)) {
           const extra = `${log.amount}${log.amountUnit === 'min' ? 'm' : ''}`;
           const last = row.length - 1;
           row[last] = row[last] === '' || row[last] === 'SKIPPED' ? extra : `${row[last]} ${extra}`;
