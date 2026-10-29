@@ -296,7 +296,7 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
                 <span>Habit Strength Retention Curves</span>
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Exponential memory decay ($T_{1/2} = 21$ days). Single missed days do not reset progress.
+                Exponential memory decay (21-day half-life). Single missed days do not reset progress.
               </p>
             </div>
             <span className="text-xs font-semibold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-800">

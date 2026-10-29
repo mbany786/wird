@@ -13,6 +13,8 @@
     "cap:open:android": "cap open android",
     "build:ios": "tsc -b && vite build && cap sync ios",
     "build:android": "tsc -b && vite build && cap sync android",
+    "ios:release": "bash scripts/ios-release.sh",
+    "ios:upload": "bash scripts/ios-release.sh --upload",
     "apk:debug": "bun run build:android && cd android && JAVA_HOME=\"${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}\" ./gradlew assembleDebug"
   },
   "dependencies": {
