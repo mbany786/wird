@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { db } from './db';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from './types';
 import { TEMPLATES } from './data/templates';
@@ -8,6 +8,7 @@ import { DailyRoutineView } from './components/DailyRoutineView';
 import { BiAnalyticsDashboard } from './components/BiAnalyticsDashboard';
 import { CellEditorModal } from './components/CellEditorModal';
 import { TemplateCustomizerModal } from './components/TemplateCustomizerModal';
+import { ActivityFilter, ALL_ACTIVITIES, filterHabits } from './components/ActivityFilter';
 import { downloadExcel, printPDF, getEmailReportUri } from './utils/exportUtils';
 import { todayStr, currentMonthStr } from './utils/date';
 
@@ -37,6 +38,15 @@ export const App: React.FC = () => {
   } | null>(null);
 
   const [isCustomizerOpen, setIsCustomizerOpen] = useState<boolean>(false);
+
+  // Activity filter: show every habit, one section, or a single habit across Matrix / Daily / Analytics
+  const [activityFilter, setActivityFilter] = useState<string>(ALL_ACTIVITIES);
+  useEffect(() => { setActivityFilter(ALL_ACTIVITIES); }, [currentTemplate.id]);
+  const visibleHabits = useMemo(() => filterHabits(habits, activityFilter), [habits, activityFilter]);
+  const visibleSections = useMemo(
+    () => (activityFilter === ALL_ACTIVITIES ? sections : sections.filter(s => visibleHabits.some(h => h.sectionId === s.id))),
+    [sections, visibleHabits, activityFilter]
+  );
 
   // Initialize DB and Seed Data
   useEffect(() => {
@@ -396,11 +406,22 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 pt-4 md:p-6 space-y-6 pb-[calc(env(safe-area-inset-bottom)+49px+24px)] sm:pb-[max(env(safe-area-inset-bottom),24px)]">
+        {/* Activity filter */}
+        <div className="-mb-3">
+          <ActivityFilter
+            habits={habits}
+            sections={sections}
+            value={visibleHabits.length === habits.length ? ALL_ACTIVITIES : activityFilter}
+            onChange={setActivityFilter}
+            showUrdu={currentTemplate.id === 'daily_spiritual_schedule'}
+          />
+        </div>
+
         {activeView === 'matrix' && (
           <MatrixGrid
             template={currentTemplate}
-            habits={habits}
-            sections={sections}
+            habits={visibleHabits}
+            sections={visibleSections}
             logs={logs.filter(l => l.date.startsWith(currentMonth))}
             currentMonth={currentMonth}
             onCellClick={handleCellClick}
@@ -417,8 +438,8 @@ export const App: React.FC = () => {
         {activeView === 'daily' && (
           <DailyRoutineView
             template={currentTemplate}
-            habits={habits}
-            sections={sections}
+            habits={visibleHabits}
+            sections={visibleSections}
             logs={logs}
             selectedDate={selectedDate}
             onDateChange={setSelectedDate}
@@ -432,7 +453,7 @@ export const App: React.FC = () => {
         {activeView === 'bi' && (
           <BiAnalyticsDashboard
             template={currentTemplate}
-            habits={habits}
+            habits={visibleHabits}
             logs={logs.filter(l => l.date.startsWith(currentMonth))}
             currentMonth={currentMonth}
           />
