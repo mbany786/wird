@@ -131,7 +131,8 @@ export const Header: React.FC<HeaderProps> = ({
                 }`}
                 title="Toggle Hijri Calendar dates across table and daily views"
               >
-                <span>🌙 Hijri</span>
+                <Moon className="w-3.5 h-3.5" />
+                <span>Hijri</span>
                 <span className={`text-[9px] px-1 py-0.2 rounded font-mono font-bold ${showHijri ? 'bg-emerald-800 text-white' : 'bg-slate-700 text-slate-400'}`}>
                   {showHijri ? 'ON' : 'OFF'}
                 </span>

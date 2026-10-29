@@ -3,8 +3,12 @@
 @tailwind utilities;
 
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "Geeza Pro", "Damascus", "Al Nile", "Noto Naskh Arabic", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color-scheme: light dark;
+}
+
+[dir="rtl"], .font-arabic, [lang="ur"], [lang="ar"] {
+  font-family: "Geeza Pro", "Damascus", "Al Nile", "Noto Naskh Arabic", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 body {

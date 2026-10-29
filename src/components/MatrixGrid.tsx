@@ -429,7 +429,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                   <div className="flex items-center gap-1.5">
                     <span>Tasks & Schedule</span>
                     {isSpiritualTemplate && template.urduTitle && (
-                      <span className="text-xs text-emerald-400 font-normal">({template.urduTitle})</span>
+                      <span className="text-xs text-emerald-400 font-normal font-arabic" dir="rtl">({template.urduTitle})</span>
                     )}
                   </div>
                 </th>
