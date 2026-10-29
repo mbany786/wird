@@ -10,6 +10,12 @@ const config: CapacitorConfig = {
     preferredContentMode: 'mobile',
     backgroundColor: '#020617',
   },
+  android: {
+    backgroundColor: '#020617',
+    allowMixedContent: false,
+    captureInput: true,
+    webContentsDebuggingEnabled: true,
+  },
   server: {
     androidScheme: 'https',
     iosScheme: 'capacitor',

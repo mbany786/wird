@@ -10,9 +10,13 @@
     "preview": "vite preview",
     "cap:sync": "cap sync",
     "cap:open": "cap open ios",
-    "build:ios": "tsc -b && vite build && cap sync ios"
+    "cap:open:android": "cap open android",
+    "build:ios": "tsc -b && vite build && cap sync ios",
+    "build:android": "tsc -b && vite build && cap sync android",
+    "apk:debug": "bun run build:android && cd android && JAVA_HOME=\"${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}\" ./gradlew assembleDebug"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.0",
     "@capacitor/core": "^8.6.0",
     "@capacitor/ios": "^8.6.0",
     "canvas-confetti": "^1.9.4",

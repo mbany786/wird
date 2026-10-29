@@ -27,3 +27,10 @@ dist-ssr
 ios/build/
 ios/App/Pods/
 ios/App/build/
+
+# Android build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/

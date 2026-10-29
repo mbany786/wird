@@ -85,6 +85,28 @@ export const App: React.FC = () => {
     loadRemarks();
   }, [currentMonth, currentTemplate]);
 
+  // Handle Android hardware back button & Escape key to close active modals before exiting
+  useEffect(() => {
+    const handleBackOrEscape = (e: Event) => {
+      if (cellModalData) {
+        e.preventDefault?.();
+        setCellModalData(null);
+      } else if (isCustomizerOpen) {
+        e.preventDefault?.();
+        setIsCustomizerOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleBackOrEscape(e);
+    };
+    document.addEventListener('backbutton', handleBackOrEscape, false);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('backbutton', handleBackOrEscape, false);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [cellModalData, isCustomizerOpen]);
+
   // Handle cell click on 31-day matrix
   const handleCellClick = (habit: Habit, date: string, dayNumber: number) => {
     const existingLog = logs.find(l => l.habitId === habit.id && l.date === date);
