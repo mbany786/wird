@@ -15,14 +15,15 @@ Copy-paste these values into App Store Connect → *My Apps → Wird*.
 | Content Rights | Does not contain third-party content |
 | Age Rating | 4+ (no objectionable content; answer "None" to all questionnaire items) |
 | Price | Free |
+| Copyright | `2026 VitalScale Technologies LLC` |
 
 ## URLs
 
 | Field | Value |
 |---|---|
-| Privacy Policy URL | `https://<your-render-domain>/privacy.html` |
-| Support URL | `https://<your-render-domain>/support.html` |
-| Marketing URL (optional) | `https://<your-render-domain>/` |
+| Privacy Policy URL | `https://wird-habit-os.onrender.com/privacy.html` |
+| Support URL | `https://wird-habit-os.onrender.com/support.html` |
+| Marketing URL (optional) | `https://wird-habit-os.onrender.com/` |
 
 > Both pages ship from `public/` and deploy with the web app on Render.
 
@@ -72,8 +73,10 @@ Urdu and Arabic labels are shown throughout, alongside English.
 
 ## Keywords (≤100, comma-separated, no spaces)
 
+Words already in the name and subtitle (Wird, Mamulat, Habit, Tracker, Prayer, Dhikr, Daily, Matrix) are indexed automatically, so they are left out here.
+
 ```
-mamulat,wird,dhikr,zikr,tasbih,salah,namaz,prayer,quran,habit,islamic,muslim,tracker,hijri,sunnah
+zikr,tasbih,salah,namaz,quran,islamic,muslim,hijri,sunnah,tahajjud,adhkar,azkar,ibadah,qaza,routine
 ```
 
 ## What's New (v1.0)
@@ -98,7 +101,9 @@ First release of Wird — your private 31-day Mamulat matrix for prayers, dhikr,
 |---|---|
 | Sign-in required | No |
 | Notes | `Wird works fully offline with no account. All data is stored locally on the device. To test editing, open the Matrix tab, pick a day with "Active Edit Day", and tap +/− on any habit.` |
-| Contact | *(your name, phone, email)* |
+| Contact name | Mahdi Anayetullah |
+| Contact email | m.anayetullah@gmail.com |
+| Contact phone | +1 609 375 7753 |
 
 ## Screenshots
 
@@ -109,6 +114,28 @@ First release of Wird — your private 31-day Mamulat matrix for prayers, dhikr,
 
 Upload in order 01 → 05.
 
+| # | Caption | Screen |
+|---|---|---|
+| 01 | Your 31-Day Mamulat Matrix — Edit any day's count right in the grid | Matrix with quick-count dock |
+| 02 | Log Each Prayer in One Tap — Takbeer-e-Oola, Jamat, Individual or Qaza | Daily view |
+| 03 | See the Whole Month at a Glance — Monthly summaries for every habit | Full-month matrix |
+| 04 | Track Your Spiritual Growth — Zikr totals, Quran pages & habit strength | Analytics |
+| 05 | Build Your Own Routine — Templates, a blank slate, or generate one | Template Studio |
+
+iPad shots are real iPad Pro 13" (M5) simulator captures; uncaptioned originals are in `appstore/screenshots/ipad_raw/`.
+
 ## App Icon
 
 - 1024 × 1024 RGB PNG, no alpha: `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`
+
+## Release Checklist
+
+- [x] Signed IPA: `ios/build/export/App.ipa` (v1.0, build 202610291624). Rebuild with `bun run ios:release` right before uploading so it carries the latest web bundle and a fresh build number.
+- [x] App icon, splash, privacy manifest, export-compliance flag
+- [x] iPhone 6.9" and iPad 13" screenshots (5 each)
+- [x] Listing text within App Store limits (name 29/30, subtitle 27/30, promo 134/170, keywords 99/100, description 1276/4000)
+- [x] App Review contact: Mahdi Anayetullah · m.anayetullah@gmail.com · +1 609 375 7753
+- [ ] Make the GitHub repo `mbany786/wird` private (Settings → General → Danger Zone → Change visibility). Privacy and Support pages no longer link to it.
+- [ ] Deploy `render.yaml` on Render (New → Blueprint → `mbany786/wird`) and confirm `https://wird-habit-os.onrender.com/privacy.html` and `/support.html` load. If Render assigns a different domain, update the URLs above.
+- [ ] Create the app record in App Store Connect (bundle ID `com.wird.habits`, SKU `wird-habits-001`).
+- [ ] Upload: `bun run ios:upload`, or Xcode → Organizer → Distribute App. **Not yet — hold until approved.**
