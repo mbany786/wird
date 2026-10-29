@@ -154,7 +154,7 @@ export function calculateMonthSummary(
 
   return {
     habitId: habit.id,
-    totalLoggedDays: logsForMonth.length,
+    totalLoggedDays: logsForMonth.filter(l => l.status !== 'SKIPPED').length,
     totalDaysInMonth: daysInMonth,
     completionRate,
     totalVolume,

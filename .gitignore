@@ -34,3 +34,6 @@ android/build/
 android/app/build/
 android/local.properties
 android/captures/
+
+# Headless UI snapshots (bun run ui:snap / ios:sim:shot)
+.snapshots/

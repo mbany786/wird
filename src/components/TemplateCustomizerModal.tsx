@@ -431,7 +431,7 @@ export const TemplateCustomizerModal: React.FC<TemplateCustomizerModalProps> = (
                         <span>{section.title}</span>
                         {section.urduTitle && <span className="text-[11px] text-emerald-400/80" dir="rtl">• {section.urduTitle}</span>}
                       </div>
-                      <span className="text-[10px] text-slate-500 font-normal">{secHabits.length} tasks</span>
+                      <span className="text-[11px] text-slate-500 font-normal">{secHabits.length} tasks</span>
                     </h4>
 
                     {secHabits.length === 0 ? (
@@ -459,16 +459,16 @@ export const TemplateCustomizerModal: React.FC<TemplateCustomizerModalProps> = (
                               {habit.urduTitle && (
                                 <span className="text-[11px] text-emerald-400 font-normal" dir="rtl">{habit.urduTitle}</span>
                               )}
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
                                 {habit.category === 'NEGATIVE_ABSTINENCE' ? 'Abstinence' : habit.inputType}
                               </span>
                               {habit.unit && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono font-bold">
+                                <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono font-bold">
                                   {habit.targetValue} {habit.unit}
                                 </span>
                               )}
                               {habit.cadence === 'FRIDAY_ONLY' && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                                <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
                                   Friday
                                 </span>
                               )}
@@ -527,7 +527,7 @@ export const TemplateCustomizerModal: React.FC<TemplateCustomizerModalProps> = (
                   <button
                     type="button"
                     onClick={() => setActiveTab('settings')}
-                    className="text-[10px] text-emerald-400 hover:underline"
+                    className="text-[11px] text-emerald-400 hover:underline"
                   >
                     + Manage Sections
                   </button>
@@ -695,14 +695,14 @@ export const TemplateCustomizerModal: React.FC<TemplateCustomizerModalProps> = (
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-white">{preset.title}</span>
-                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
                           {preset.badge}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-400 leading-relaxed">
                         {preset.description}
                       </p>
-                      <div className="text-[10px] text-emerald-400/90 font-medium mt-2">
+                      <div className="text-[11px] text-emerald-400/90 font-medium mt-2">
                         {preset.sections.length} sections • {preset.habits.length} habits
                       </div>
                     </div>
@@ -804,9 +804,9 @@ export const TemplateCustomizerModal: React.FC<TemplateCustomizerModalProps> = (
                       className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-500 font-mono text-[10px]">#{idx + 1}</span>
+                        <span className="text-slate-500 font-mono text-[11px]">#{idx + 1}</span>
                         <span className="font-semibold text-slate-200">{sec.title}</span>
-                        <span className="text-[10px] text-slate-500">({count} tasks)</span>
+                        <span className="text-[11px] text-slate-500">({count} tasks)</span>
                       </div>
 
                       {onDeleteSection && (

@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import confetti from 'canvas-confetti';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { todayStr } from '../utils/date';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { calculateMonthSummary } from '../utils/analytics';
 import { getHijriDate } from '../utils/hijri';
@@ -68,28 +68,26 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
     day: number;
     date: string;
   } | null>(null);
-  const [activeDay, setActiveDay] = useState<number>(1);
-
-  const triggerCelebration = () => {
-    try {
-      confetti({
-        particleCount: 40,
-        spread: 60,
-        origin: { y: 0.85 }
-      });
-    } catch {
-      // ignore
-    }
+  // Active edit day defaults to today when viewing the current month, otherwise day 1
+  const defaultActiveDay = (monthKey: string) => {
+    const today = todayStr();
+    return today.startsWith(monthKey) ? Number(today.slice(8, 10)) : 1;
   };
+  const [activeDay, setActiveDay] = useState<number>(() => defaultActiveDay(currentMonth));
+  useEffect(() => {
+    setActiveDay(defaultActiveDay(currentMonth));
+    setSelectedCell(null);
+  }, [currentMonth]);
+
 
   // Compute target date for cycle analysis (defaults to today's date or mid-month)
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const today = useMemo(() => todayStr(), []);
   const cycleTargetDate = useMemo(() => {
-    if (todayStr.startsWith(currentMonth)) {
-      return todayStr;
+    if (today.startsWith(currentMonth)) {
+      return today;
     }
     return `${currentMonth}-15`;
-  }, [currentMonth, todayStr]);
+  }, [currentMonth, today]);
 
   const cycleAnalysis = useMemo(() => {
     if (!isCycleTemplate) return null;
@@ -104,6 +102,35 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
   // Ensure activeDay stays within valid range for month
   const safeActiveDay = Math.min(Math.max(1, activeDay), daysInMonth);
   const activeDateStr = `${currentMonth}-${String(safeActiveDay).padStart(2, '0')}`;
+  const todayDayInMonth = today.startsWith(currentMonth) ? Number(today.slice(8, 10)) : 0;
+  const isViewingToday = todayDayInMonth === safeActiveDay;
+  const activeDayLabel = useMemo(() => {
+    const d = new Date(year, month - 1, safeActiveDay);
+    const label = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
+    return isViewingToday ? `Today · ${d.getDate()}` : label;
+  }, [year, month, safeActiveDay, isViewingToday]);
+
+  // One-time usage hint (remembered per device)
+  const [showHint, setShowHint] = useState<boolean>(() => {
+    try { return localStorage.getItem('wird.matrixHintSeen') !== '1'; } catch { return true; }
+  });
+  const dismissHint = () => {
+    setShowHint(false);
+    try { localStorage.setItem('wird.matrixHintSeen', '1'); } catch { /* storage unavailable */ }
+  };
+
+  // Keep the active day column in view inside the horizontally scrolling matrix
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const th = el.querySelector<HTMLElement>(`[data-day="${safeActiveDay}"]`);
+    const sticky = el.querySelector<HTMLElement>('[data-sticky-col]');
+    if (!th) return;
+    const stickyW = sticky?.offsetWidth ?? 0;
+    const left = th.offsetLeft - stickyW - 2 * th.offsetWidth;
+    el.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+  }, [safeActiveDay, currentMonth]);
 
   const handleQuickUpdate = (logData: Partial<HabitLog>) => {
     if (!selectedCell || !onUpdateLog) return;
@@ -159,7 +186,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
       if (activeValid && activeEntry?.status !== 'COMPLETED') {
         onUpdateLog(habit.id, { status: 'COMPLETED', numericValue: 1, date: activeDateStr });
         setSelectedCell({ habit, day: safeActiveDay, date: activeDateStr });
-        triggerCelebration();
         return;
       }
       for (const d of candidateDays) {
@@ -169,7 +195,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
           onUpdateLog(habit.id, { status: 'COMPLETED', numericValue: 1, date: dStr });
           setActiveDay(d);
           setSelectedCell({ habit, day: d, date: dStr });
-          triggerCelebration();
           return;
         }
       }
@@ -201,7 +226,19 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
     if (!stateObj) return;
 
     if (delta === 1) {
-      // First look for an unlogged day in the month so adding +1 increases that state's count without overwriting another state
+      // Prefer the active edit day (today by default) when it has no entry yet
+      const activeEntryFirst = logMap.get(`${habit.id}:${activeDateStr}`);
+      if (!activeEntryFirst || !activeEntryFirst.stateCode || activeEntryFirst.status === 'SKIPPED') {
+        onUpdateLog(habit.id, {
+          status: stateObj.scoreWeight > 0 ? 'COMPLETED' : 'FAILED',
+          stateCode: stateObj.code,
+          numericValue: stateObj.scoreWeight,
+          date: activeDateStr
+        });
+        setSelectedCell({ habit, day: safeActiveDay, date: activeDateStr });
+        return;
+      }
+      // Otherwise look for an unlogged day in the month so adding +1 increases that state's count without overwriting another state
       for (const d of daysArray) {
         const dStr = `${currentMonth}-${String(d).padStart(2, '0')}`;
         const l = logMap.get(`${habit.id}:${dStr}`);
@@ -214,7 +251,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
           });
           setActiveDay(d);
           setSelectedCell({ habit, day: d, date: dStr });
-          if (stateObj.scoreWeight === 1.0) triggerCelebration();
           return;
         }
       }
@@ -228,7 +264,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
           date: activeDateStr
         });
         setSelectedCell({ habit, day: safeActiveDay, date: activeDateStr });
-        if (stateObj.scoreWeight === 1.0) triggerCelebration();
         return;
       }
       for (const d of daysArray) {
@@ -243,7 +278,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
           });
           setActiveDay(d);
           setSelectedCell({ habit, day: d, date: dStr });
-          if (stateObj.scoreWeight === 1.0) triggerCelebration();
           return;
         }
       }
@@ -283,7 +317,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
         numericValue: next,
         date: dStr
       });
-      if (next === 0) triggerCelebration();
       return;
     }
 
@@ -298,7 +331,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
         unitUsed: isMin ? 'min' : 'count',
         date: dStr
       });
-      if (next >= target && (deltaSteps > 0 || (explicitValue ?? 0) >= target)) triggerCelebration();
       return;
     }
 
@@ -310,7 +342,16 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
       numericValue: next,
       date: dStr
     });
-    if (next >= target && (deltaSteps > 0 || (explicitValue ?? 0) >= target)) triggerCelebration();
+  };
+
+  // Short monthly summary shown under each task on iPhone
+  const mobileSummaryLabel = (habit: Habit, summary: ReturnType<typeof calculateMonthSummary>) => {
+    const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
+    if (habit.category === 'NEGATIVE_ABSTINENCE') return `${fmt(summary.totalVolume)} ${habit.unit || 'slips'}`;
+    if (habit.inputType === 'QUANTITY' || habit.inputType === 'LATAIF') return `Σ ${fmt(summary.totalVolume)}`;
+    if (habit.inputType === 'DURATION') return `${fmt(summary.totalVolume)}m`;
+    const possible = habit.cadence === 'FRIDAY_ONLY' ? fridayDays.length : daysInMonth;
+    return `${summary.totalLoggedDays}/${possible}`;
   };
 
   // Group habits by section
@@ -341,19 +382,19 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
     const isFriday = fridayDays.includes(day);
 
     if (habit.cadence === 'FRIDAY_ONLY' && !isFriday) {
-      return <span className="text-slate-700/40 select-none text-[10px]">•</span>;
+      return <span className="text-slate-700/40 select-none text-[11px]">•</span>;
     }
 
     if (!log) {
       return (
-        <span className="w-full h-full flex items-center justify-center text-slate-700 hover:text-slate-400 text-xs">
+        <span className="w-full h-full flex items-center justify-center text-slate-700 hover:text-slate-400 text-[15px]">
           ·
         </span>
       );
     }
 
     if (log.status === 'SKIPPED') {
-      return <span className="text-[11px] text-slate-500 font-medium">⏸</span>;
+      return <span className="text-[15px] text-slate-600" title="Cleared / skipped">–</span>;
     }
 
     // 0. Negative Habits (Inverse Tracking: 0 incidents = Clean Day)
@@ -363,7 +404,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
         const isDuration = habit.inputType === 'DURATION';
         return (
           <span 
-            className="px-1 py-0.5 rounded text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-800 shadow-sm"
+            className="px-1 py-0.5 rounded text-[11px] font-bold bg-rose-950 text-rose-300 border border-rose-800 shadow-sm"
             title={`${incidents} ${habit.unit || (isDuration ? 'min' : 'incident(s)')} recorded`}
           >
             !{incidents}{isDuration ? 'm' : ''}
@@ -372,7 +413,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
       } else {
         return (
           <span 
-            className="text-[10px] font-bold text-emerald-400"
+            className="text-[11px] font-bold text-emerald-400"
             title="Clean Day (0 Incidents - Abstinence intact)"
           >
             ✓
@@ -387,7 +428,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
       if (state) {
         return (
           <span 
-            className="w-5 h-5 flex items-center justify-center rounded text-xs font-bold shadow-sm"
+            className="w-6 h-6 flex items-center justify-center rounded text-[15px] font-bold"
             style={{ color: state.color }}
             title={state.label}
           >
@@ -403,7 +444,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
       if (val === 0) return <span className="text-slate-700">·</span>;
       const displayVal = val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val;
       return (
-        <span className="text-[10px] font-bold text-emerald-400 font-mono tracking-tight">
+        <span className="text-[11px] font-bold text-emerald-400 tabular-nums tracking-tight">
           {displayVal}
         </span>
       );
@@ -417,7 +458,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
         const equivCount = Math.round((val * 5000) / 30);
         return (
           <span 
-            className="text-[10px] font-bold text-sky-400 font-mono tracking-tight"
+            className="text-[11px] font-bold text-sky-400 tabular-nums tracking-tight"
             title={`${val} min ≈ ${equivCount.toLocaleString()} count`}
           >
             {val}m
@@ -428,7 +469,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
         const displayVal = val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val;
         return (
           <span 
-            className="text-[10px] font-bold text-emerald-400 font-mono tracking-tight"
+            className="text-[11px] font-bold text-emerald-400 tabular-nums tracking-tight"
             title={`${val.toLocaleString()} count ≈ ${equivMin} min`}
           >
             {displayVal}
@@ -442,7 +483,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
       const mins = log.numericValue ?? 0;
       if (mins === 0) return <span className="text-slate-700">·</span>;
       return (
-        <span className="text-[10px] font-bold text-sky-400 font-mono">
+        <span className="text-[11px] font-bold text-sky-400 tabular-nums">
           {mins}m
         </span>
       );
@@ -450,16 +491,16 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
 
     // 4. Boolean Checkbox
     if (log.status === 'COMPLETED') {
-      return <span className="text-emerald-400 font-bold text-xs">✓</span>;
+      return <span className="text-emerald-400 font-bold text-[15px]">✓</span>;
     } else if (log.status === 'FAILED') {
-      return <span className="text-rose-400 font-bold text-xs">✗</span>;
+      return <span className="text-rose-400 font-bold text-[15px]">✗</span>;
     }
 
     return <span className="text-slate-700">·</span>;
   };
 
   return (
-    <div className={`space-y-6 ${selectedCell ? 'pb-44 sm:pb-48' : 'pb-12'}`}>
+    <div className={`space-y-6 ${selectedCell ? 'pb-[380px] sm:pb-56' : 'pb-4 sm:pb-12'}`}>
       {/* Blank / Custom Template Welcoming Banner */}
       {isBlankTemplate && (
         <div className="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-sky-950/60 border border-emerald-800/60 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl">
@@ -470,7 +511,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-white">Custom Tracker Canvas</h3>
-                <span className="text-[10px] bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded-full font-mono border border-emerald-700">
+                <span className="text-[11px] bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded-full tabular-nums border border-emerald-700">
                   Fully Editable
                 </span>
               </div>
@@ -522,7 +563,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
               <div className="bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
                 <span className="text-slate-400">Next Period in: </span>
                 <span className="text-rose-400 font-bold">~{cycleAnalysis.daysUntilNextPeriod} days</span>
-                <span className="text-slate-500 text-[10px] ml-1">({cycleAnalysis.nextPeriodEstimatedDate})</span>
+                <span className="text-slate-500 text-[11px] ml-1">({cycleAnalysis.nextPeriodEstimatedDate})</span>
               </div>
 
               <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 px-2 py-1 rounded-xl text-xs">
@@ -533,7 +574,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                   className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded font-bold text-xs"
                   title="Decrease average cycle length"
                 >-</button>
-                <span className="font-bold text-slate-200 font-mono px-1">{cycleLength}d</span>
+                <span className="font-bold text-slate-200 tabular-nums px-1">{cycleLength}d</span>
                 <button
                   type="button"
                   onClick={() => setCycleLength(Math.min(38, cycleLength + 1))}
@@ -560,7 +601,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
               <div style={{ width: `${((cycleLength - 16) / cycleLength) * 100}%` }} className="bg-purple-500/80 h-full" title={`Luteal: Days 17-${cycleLength}`} />
             </div>
 
-            <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono px-1">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 tabular-nums px-1">
               <span>Day 1</span>
               <span className="text-white font-bold bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700">
                 Today is Cycle Day {cycleAnalysis.currentCycleDay}
@@ -585,7 +626,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
 
               <div className="flex flex-wrap gap-1.5 pt-3 mt-2 border-t border-slate-800/80">
                 {cycleAnalysis.phaseInfo.moodTraits.map((trait, i) => (
-                  <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 font-medium">
+                  <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 font-medium">
                     {trait}
                   </span>
                 ))}
@@ -609,7 +650,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 </ul>
               </div>
 
-              <div className="pt-2 mt-2 border-t border-slate-800/80 text-[10px] text-slate-400">
+              <div className="pt-2 mt-2 border-t border-slate-800/80 text-[11px] text-slate-400">
                 <span className="font-semibold text-slate-300">Hormones: </span>
                 {cycleAnalysis.phaseInfo.hormoneProfile}
               </div>
@@ -625,18 +666,18 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
 
                 <div className="space-y-1.5 text-xs">
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Nutrition: </span>
+                    <span className="text-[11px] uppercase font-bold text-emerald-400 tracking-wider">Nutrition: </span>
                     <p className="text-slate-300 text-[11px] leading-snug mt-0.5">{cycleAnalysis.phaseInfo.nutritionAdvice}</p>
                   </div>
 
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-sky-400 tracking-wider">Movement: </span>
+                    <span className="text-[11px] uppercase font-bold text-sky-400 tracking-wider">Movement: </span>
                     <p className="text-slate-300 text-[11px] leading-snug mt-0.5">{cycleAnalysis.phaseInfo.movementAdvice}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-2 mt-2 border-t border-slate-800/80 text-[10px] text-slate-400">
+              <div className="pt-2 mt-2 border-t border-slate-800/80 text-[11px] text-slate-400">
                 <span className="font-semibold text-purple-300">Best For: </span>
                 {cycleAnalysis.phaseInfo.productivityTip}
               </div>
@@ -648,51 +689,69 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
       {/* Scrollable Matrix Table Container */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
         {/* Matrix Quick-Edit Active Day Bar */}
-        <div className="bg-slate-950/95 border-b border-slate-800 px-3 sm:px-4 py-2 flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
-              Active Edit Day:
-            </span>
-            <div className="flex items-center gap-1 bg-slate-900 border border-emerald-700/60 rounded-lg p-0.5">
+        <div className="bg-slate-950/95 border-b border-slate-800 px-3 sm:px-4 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[13px] font-medium text-slate-400">Editing</span>
+            <div className="flex items-center gap-1 bg-slate-900 border border-emerald-700/60 rounded-xl p-0.5">
               <button
                 type="button"
                 onClick={() => handleSelectDay(safeActiveDay - 1)}
                 disabled={safeActiveDay <= 1}
-                className="p-1 rounded hover:bg-slate-800 disabled:opacity-40 text-slate-200 transition"
-                title="Previous Day"
+                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-slate-800 disabled:opacity-40 text-slate-200 transition"
+                aria-label="Previous day"
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
+                <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="px-2 text-xs font-mono font-bold text-emerald-300">
-                Day {safeActiveDay}
+              <span className="px-1.5 min-w-[96px] text-center text-[15px] font-semibold text-emerald-300 tabular-nums">
+                {activeDayLabel}
               </span>
               <button
                 type="button"
                 onClick={() => handleSelectDay(safeActiveDay + 1)}
                 disabled={safeActiveDay >= daysInMonth}
-                className="p-1 rounded hover:bg-slate-800 disabled:opacity-40 text-slate-200 transition"
-                title="Next Day"
+                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-slate-800 disabled:opacity-40 text-slate-200 transition"
+                aria-label="Next day"
               >
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
+            {!isViewingToday && todayDayInMonth ? (
+              <button
+                type="button"
+                onClick={() => handleSelectDay(todayDayInMonth)}
+                className="text-[13px] font-semibold text-emerald-400 px-2 min-h-[36px]"
+              >
+                Today
+              </button>
+            ) : (
+              <span className="w-[52px]" aria-hidden />
+            )}
           </div>
-          <span className="text-[10px] text-slate-400">
-            Tap <strong className="text-emerald-400">− / +</strong> on any task or tap any day cell (1–{daysInMonth})
-          </span>
+          {showHint && (
+            <div className="mt-2 flex items-start justify-between gap-2 text-[13px] text-slate-400">
+              <span>Tap a task to log counts for this day, or tap any day cell to change it.</span>
+              <button
+                type="button"
+                onClick={dismissHint}
+                className="shrink-0 text-emerald-400 font-semibold min-h-[28px]"
+              >
+                Got it
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" ref={scrollRef}>
           <table className="w-full text-left border-collapse min-w-[980px]">
             {/* Table Header: Day Numbers 1 to 31 + Optional Hijri */}
             <thead>
               <tr className="bg-slate-950/90 border-b border-slate-800 text-slate-300 text-xs">
                 {/* Pinned Habit Name & Inline Counter Column */}
-                <th className="sticky left-0 z-20 bg-slate-950 px-2.5 sm:px-4 py-2.5 w-[178px] min-w-[178px] max-w-[178px] sm:w-[250px] sm:min-w-[250px] sm:max-w-none border-r border-slate-800 shadow-[2px_0_8px_rgba(0,0,0,0.4)]">
+                <th data-sticky-col className="sticky left-0 z-20 bg-slate-950 px-3 sm:px-4 py-2 w-[132px] min-w-[132px] max-w-[132px] sm:w-[250px] sm:min-w-[250px] sm:max-w-none border-r border-slate-800 shadow-[2px_0_8px_rgba(0,0,0,0.4)]">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                    <span className="font-bold tracking-wide uppercase text-slate-300 text-[11px]">Tasks & Counts</span>
+                    <span className="font-semibold text-slate-400 text-[13px]">Tasks</span>
                     {isSpiritualTemplate && template.urduTitle && (
-                      <span className="text-[11px] text-emerald-400 font-normal font-arabic normal-case tracking-normal" dir="rtl">({template.urduTitle})</span>
+                      <span className="hidden sm:inline text-[13px] text-emerald-400 font-normal font-arabic" dir="rtl">({template.urduTitle})</span>
                     )}
                   </div>
                 </th>
@@ -707,8 +766,9 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                   return (
                     <th
                       key={d}
+                      data-day={d}
                       onClick={() => handleSelectDay(d)}
-                      className={`text-center py-2 px-1 w-8 min-w-[34px] font-semibold text-[11px] border-r border-slate-800/60 cursor-pointer select-none transition ${
+                      className={`text-center py-1.5 px-0.5 w-10 min-w-[40px] font-semibold border-r border-slate-800/60 cursor-pointer select-none transition ${
                         isActiveDayCol
                           ? 'bg-emerald-900/60 text-emerald-200 ring-1 ring-inset ring-emerald-400 font-bold'
                           : isFriday 
@@ -721,14 +781,14 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                           : `Day ${d} — Tap to set active edit day`
                       }
                     >
-                      <div className="text-[11px] font-bold">{d}</div>
+                      <div className="text-[13px] font-semibold tabular-nums">{d}</div>
                       {hijriInfo && (
-                        <div className="text-[9px] text-emerald-300 font-mono font-medium -mt-0.5">
-                          {hijriInfo.day}h
+                        <div className="text-[11px] text-emerald-400/80 font-medium tabular-nums leading-tight">
+                          {hijriInfo.day}
                         </div>
                       )}
                       {isFriday && (
-                        <div className="text-[8px] text-emerald-400 font-normal">
+                        <div className="hidden sm:block text-[11px] text-emerald-400 font-normal leading-tight">
                           Fri
                         </div>
                       )}
@@ -755,22 +815,23 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                         colSpan={daysInMonth + 2}
                         className="p-0 bg-slate-950/90 border-y border-slate-800"
                       >
-                        <div className="sticky left-0 w-[calc(100vw-28px)] max-w-[520px] px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-bold tracking-wider uppercase text-[11px] text-emerald-400 truncate">{section.title}</span>
+                        <div className="sticky left-0 w-[calc(100vw-34px)] max-w-[520px] pl-3 pr-1 sm:px-4 py-1.5 flex items-center justify-between gap-2">
+                          <div className="flex items-baseline gap-2 min-w-0">
+                            <span className="font-semibold text-[13px] text-emerald-400 truncate">{section.title}</span>
                             {isSpiritualTemplate && section.urduTitle && (
-                              <span className="text-xs font-normal text-emerald-300/80 font-arabic normal-case tracking-normal shrink-0" dir="rtl">
-                                • {section.urduTitle}
+                              <span className="text-[13px] font-normal text-emerald-300/70 font-arabic shrink-0" dir="rtl">
+                                {section.urduTitle}
                               </span>
                             )}
                           </div>
 
                           <button
                             onClick={() => onAddCustomHabit(section.id)}
-                            className="flex items-center gap-1 text-[10px] font-medium text-slate-300 hover:text-emerald-300 bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded border border-slate-700 transition shrink-0"
+                            className="flex items-center justify-center gap-1 min-w-[36px] h-9 sm:h-8 text-[13px] font-medium text-slate-400 hover:text-emerald-300 sm:bg-slate-800 hover:bg-slate-800 sm:px-2.5 rounded-lg sm:border border-slate-700 transition shrink-0"
+                            aria-label={`Add task to ${section.title}`}
                           >
-                            <PlusCircle className="w-3 h-3" />
-                            <span>Add Task</span>
+                            <PlusCircle className="w-4 h-4" />
+                            <span className="hidden sm:inline">Add Task</span>
                           </button>
                         </div>
                       </td>
@@ -786,7 +847,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       return (
                         <tr key={habit.id} className={`group transition-colors ${isHabitSelected ? 'bg-emerald-950/20' : 'hover:bg-slate-800/40'}`}>
                           {/* Habit Title & Inline Count Editor Column (Sticky Left) */}
-                          <td className="sticky left-0 z-10 bg-slate-900 px-2.5 sm:px-3.5 py-2 w-[178px] min-w-[178px] max-w-[178px] sm:w-[250px] sm:min-w-[250px] sm:max-w-none border-r border-slate-800 font-medium text-slate-200 shadow-[2px_0_8px_rgba(0,0,0,0.35)]">
+                          <td className="sticky left-0 z-10 bg-slate-900 px-3 sm:px-3.5 py-2 w-[132px] min-w-[132px] max-w-[132px] sm:w-[250px] sm:min-w-[250px] sm:max-w-none border-r border-slate-800 font-medium text-slate-200 shadow-[2px_0_8px_rgba(0,0,0,0.35)]">
                             <div className="flex flex-col gap-1.5">
                               {/* Top Line: Habit Title + Delete Icon */}
                               <div className="flex items-start justify-between gap-1">
@@ -795,14 +856,20 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                   className="cursor-pointer hover:text-emerald-300 transition flex-1 select-none min-w-0"
                                   title="Tap to open quick count editor"
                                 >
-                                  <span className="text-slate-100 font-semibold group-hover:text-emerald-300 transition text-[11px] sm:text-xs leading-tight block truncate">
+                                  <span className="text-slate-100 font-semibold group-hover:text-emerald-300 transition text-[15px] leading-tight block truncate">
                                     {habit.title}
                                   </span>
-                                  {isSpiritualTemplate && habit.urduTitle && (
-                                    <span className="text-[11px] text-emerald-400/90 font-normal font-arabic block leading-snug" dir="rtl">
-                                      {habit.urduTitle}
+                                  <div className="flex items-baseline justify-between gap-1.5 mt-0.5">
+                                    {isSpiritualTemplate && habit.urduTitle ? (
+                                      <span className="text-[13px] text-emerald-400/80 font-normal font-arabic leading-snug truncate" dir="rtl">
+                                        {habit.urduTitle}
+                                      </span>
+                                    ) : <span />}
+                                    {/* iPhone: one compact monthly summary instead of inline steppers */}
+                                    <span className="sm:hidden text-[13px] text-slate-400 tabular-nums shrink-0">
+                                      {mobileSummaryLabel(habit, summary)}
                                     </span>
-                                  )}
+                                  </div>
                                 </div>
 
                                 {/* Direct Trash Button */}
@@ -812,15 +879,15 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                     e.stopPropagation();
                                     setTaskToDelete(habit);
                                   }}
-                                  className="opacity-60 sm:opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-rose-950 text-slate-500 hover:text-rose-400 transition shrink-0"
+                                  className="hidden sm:block sm:opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-rose-950 text-slate-500 hover:text-rose-400 transition shrink-0"
                                   title={`Remove ${habit.title}`}
                                 >
                                   <Trash2 className="w-3 h-3" />
                                 </button>
                               </div>
 
-                              {/* Bottom Line: Interactive Inline Count Stepper */}
-                              <div className="flex items-center justify-between gap-1 pt-0.5">
+                              {/* Bottom Line: Interactive Inline Count Stepper (iPad / desktop) */}
+                              <div className="hidden sm:flex items-center justify-between gap-1 pt-0.5">
                                 {/* A. NEGATIVE ABSTINENCE Inline Stepper */}
                                 {habit.category === 'NEGATIVE_ABSTINENCE' ? (
                                   <div className="flex items-center gap-1 w-full justify-between">
@@ -833,7 +900,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                       >
                                         <Minus className="w-3 h-3" />
                                       </button>
-                                      <span className={`text-[10px] font-mono font-bold px-1 ${
+                                      <span className={`text-[11px] tabular-nums font-bold px-1 ${
                                         (activeDayLog?.numericValue || 0) > 0 ? 'text-rose-400' : 'text-emerald-400'
                                       }`}>
                                         {activeDayLog?.numericValue || 0} {habit.unit || 'slips'}
@@ -847,7 +914,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                         <Plus className="w-3 h-3" />
                                       </button>
                                     </div>
-                                    <span className="text-[9px] font-mono text-slate-400">
+                                    <span className="text-[11px] tabular-nums text-slate-400">
                                       Σ{summary.totalVolume}
                                     </span>
                                   </div>
@@ -862,7 +929,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                           key={st.code}
                                           type="button"
                                           onClick={() => handleAdjustMultiStateCount(habit, st.code, 1)}
-                                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border transition active:scale-95 flex items-center gap-0.5 ${
+                                          className={`px-1.5 py-0.5 rounded text-[11px] tabular-nums font-bold border transition active:scale-95 flex items-center gap-0.5 ${
                                             isCurrentDayState
                                               ? 'bg-emerald-950/90 border-emerald-400 ring-1 ring-emerald-400/50'
                                               : 'bg-slate-950 border-slate-800 hover:bg-slate-800'
@@ -879,7 +946,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                       <button
                                         type="button"
                                         onClick={() => handleAdjustMultiStateCount(habit, activeDayLog.stateCode!, -1)}
-                                        className="w-4 h-4 flex items-center justify-center rounded bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 text-[10px]"
+                                        className="w-4 h-4 flex items-center justify-center rounded bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 text-[11px]"
                                         title={`Clear Day ${safeActiveDay}`}
                                       >
                                         −
@@ -906,7 +973,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                           const val = Math.max(0, parseFloat(e.target.value) || 0);
                                           handleInlineQuantityEdit(habit, 0, val);
                                         }}
-                                        className="w-11 bg-transparent text-center font-mono font-bold text-[11px] text-emerald-400 focus:outline-none"
+                                        className="w-11 bg-transparent text-center tabular-nums font-bold text-[11px] text-emerald-400 focus:outline-none"
                                         title={`Day ${safeActiveDay} count`}
                                       />
                                       <button
@@ -918,7 +985,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                         <Plus className="w-3 h-3" />
                                       </button>
                                     </div>
-                                    <span className="text-[9px] font-mono text-slate-400 truncate" title="Monthly Total">
+                                    <span className="text-[11px] tabular-nums text-slate-400 truncate" title="Monthly Total">
                                       Σ{summary.totalVolume >= 1000 ? `${(summary.totalVolume / 1000).toFixed(1)}k` : summary.totalVolume}
                                     </span>
                                   </div>
@@ -934,7 +1001,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                       >
                                         <Minus className="w-3 h-3" />
                                       </button>
-                                      <span className="text-[11px] font-mono font-bold text-emerald-400 px-1">
+                                      <span className="text-[11px] tabular-nums font-bold text-emerald-400 px-1">
                                         {summary.totalLoggedDays}
                                         <span className="text-slate-500 font-normal">/{habit.cadence === 'FRIDAY_ONLY' ? fridayDays.length : daysInMonth}</span>
                                       </span>
@@ -947,7 +1014,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                         <Plus className="w-3 h-3" />
                                       </button>
                                     </div>
-                                    <span className="text-[9px] font-mono text-slate-400">
+                                    <span className="text-[11px] tabular-nums text-slate-400">
                                       {summary.completionRate}%
                                     </span>
                                   </div>
@@ -977,7 +1044,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                         numericValue: newStatus === 'COMPLETED' ? 1 : 0,
                                         date: dateStr
                                       });
-                                      if (newStatus === 'COMPLETED') triggerCelebration();
                                       setSelectedCell({ habit, day: d, date: dateStr });
                                       return;
                                     }
@@ -991,7 +1057,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                         numericValue: nextState.scoreWeight,
                                         date: dateStr
                                       });
-                                      if (nextState.scoreWeight === 1.0) triggerCelebration();
                                       setSelectedCell({ habit, day: d, date: dateStr });
                                       return;
                                     }
@@ -1006,7 +1071,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                           numericValue: next,
                                           date: dateStr
                                         });
-                                        if (next >= (habit.targetValue || 1)) triggerCelebration();
                                         return;
                                       } else if (habit.inputType === 'LATAIF') {
                                         const current = cellLog?.numericValue || 0;
@@ -1017,7 +1081,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                           unitUsed: cellLog?.unitUsed || 'count',
                                           date: dateStr
                                         });
-                                        if (next >= 5000) triggerCelebration();
                                         return;
                                       } else if (habit.inputType === 'DURATION') {
                                         const current = cellLog?.numericValue || 0;
@@ -1027,7 +1090,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                           numericValue: next,
                                           date: dateStr
                                         });
-                                        if (next >= (habit.targetValue || 20)) triggerCelebration();
                                         return;
                                       }
                                     }
@@ -1060,7 +1122,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                           {/* Summary Column (Interactive + Sticky only on XL screens) */}
                           <td 
                             onClick={() => setSelectedCell({ habit, day: safeActiveDay, date: activeDateStr })}
-                            className="xl:sticky xl:right-0 z-10 bg-slate-900 px-2.5 py-1.5 border-l border-slate-800 text-center font-mono cursor-pointer hover:bg-slate-800/70 transition"
+                            className="xl:sticky xl:right-0 z-10 bg-slate-900 px-2.5 py-1.5 border-l border-slate-800 text-center tabular-nums cursor-pointer hover:bg-slate-800/70 transition"
                             title="Tap to edit counts"
                           >
                             {/* 0. Negative Habits (Inverse Tracking: 0 incidents = 100% Clean) */}
@@ -1076,14 +1138,14 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                 {summary.totalVolume === 0 ? (
                                   <div>
                                     <span className="text-emerald-400 font-bold">100% Clean</span>
-                                    <span className="text-[9px] text-emerald-400/80 font-normal block">0 incidents</span>
+                                    <span className="text-[11px] text-emerald-400/80 font-normal block">0 incidents</span>
                                   </div>
                                 ) : (
                                   <div>
                                     <span className="text-rose-400 font-bold">
                                       {summary.totalVolume} {habit.unit || 'slips'}
                                     </span>
-                                    <span className="text-[9px] text-slate-400 font-normal block">
+                                    <span className="text-[11px] text-slate-400 font-normal block">
                                       {summary.completionRate}% clean
                                     </span>
                                   </div>
@@ -1100,7 +1162,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                               <>
                                 {/* 1. Multi-State Summary */}
                                 {habit.inputType === 'MULTI_STATE' && summary.multiStateCounts && (
-                                  <div className="flex items-center justify-center gap-1 text-[10px]">
+                                  <div className="flex items-center justify-center gap-1 text-[11px]">
                                     {habit.multiStates?.map(st => (
                                       <button
                                         key={st.code}
@@ -1131,10 +1193,10 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                     </button>
                                     <div>
                                       <span className="text-emerald-400">{summary.totalVolume.toLocaleString()}</span>
-                                      <span className="text-[10px] text-slate-400 font-normal ml-1">
+                                      <span className="text-[11px] text-slate-400 font-normal ml-1">
                                         {habit.unit}
                                       </span>
-                                      <span className="text-[9px] text-slate-500 font-normal block">
+                                      <span className="text-[11px] text-slate-500 font-normal block">
                                         avg: {summary.dailyAverage}/d
                                       </span>
                                     </div>
@@ -1160,8 +1222,8 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                     </button>
                                     <div>
                                       <span className="text-emerald-400">{summary.totalVolume.toLocaleString()}</span>
-                                      <span className="text-[10px] text-slate-400 font-normal ml-1">reps</span>
-                                      <span className="text-[9px] text-sky-400 font-normal block">
+                                      <span className="text-[11px] text-slate-400 font-normal ml-1">reps</span>
+                                      <span className="text-[11px] text-sky-400 font-normal block">
                                         ≈ {Math.round(((summary.totalVolume * 30) / 5000 / 60) * 10) / 10} hrs
                                       </span>
                                     </div>
@@ -1187,8 +1249,8 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                     </button>
                                     <div>
                                       <span className="text-sky-400">{summary.totalVolume}</span>
-                                      <span className="text-[10px] text-slate-400 font-normal ml-1">min</span>
-                                      <span className="text-[9px] text-slate-500 font-normal block">
+                                      <span className="text-[11px] text-slate-400 font-normal ml-1">min</span>
+                                      <span className="text-[11px] text-slate-500 font-normal block">
                                         {Math.round((summary.totalVolume / 60) * 10) / 10} hrs
                                       </span>
                                     </div>
@@ -1220,7 +1282,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                       <span className="text-slate-400">
                                         {habit.cadence === 'FRIDAY_ONLY' ? fridayDays.length : daysInMonth}
                                       </span>
-                                      <span className="text-[10px] text-slate-500 ml-1">
+                                      <span className="text-[11px] text-slate-500 ml-1">
                                         ({summary.completionRate}%)
                                       </span>
                                     </div>
@@ -1236,7 +1298,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
 
                                 {/* 5. Slot Summary */}
                                 {habit.inputType === 'SLOT' && (
-                                  <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-300">
+                                  <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-300">
                                     <button
                                       type="button"
                                       onClick={(e) => { e.stopPropagation(); handleAdjustBooleanCount(habit, -1); }}
@@ -1411,7 +1473,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                     <span className="text-slate-300">Incident Logged</span>
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400 bg-slate-950 p-2 rounded-lg border border-slate-800">
+                <p className="text-[11px] text-slate-400 bg-slate-950 p-2 rounded-lg border border-slate-800">
                   <span className="text-emerald-400 font-semibold">Inverse Tracking:</span> 0 incidents = 100% clean score and maintains clean streak. Logged incidents track triggers and penalize score.
                 </p>
               </div>
@@ -1431,21 +1493,21 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       <span className="text-emerald-400 font-bold">✓</span>
                       <span className="text-slate-200 font-medium">Clean Whole Foods</span>
                     </div>
-                    <span className="text-emerald-400 text-[10px] font-bold">100% Score</span>
+                    <span className="text-emerald-400 text-[11px] font-bold">100% Score</span>
                   </div>
                   <div className="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800">
                     <div className="flex items-center gap-2">
                       <span className="text-amber-400 font-bold">•</span>
                       <span className="text-slate-200 font-medium">1 Small Deviation</span>
                     </div>
-                    <span className="text-amber-400 text-[10px] font-bold">70% Score</span>
+                    <span className="text-amber-400 text-[11px] font-bold">70% Score</span>
                   </div>
                   <div className="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800">
                     <div className="flex items-center gap-2">
                       <span className="text-rose-400 font-bold">✗</span>
                       <span className="text-slate-200 font-medium">Junk Food / Cheat Day</span>
                     </div>
-                    <span className="text-rose-400 text-[10px] font-bold">0% Score</span>
+                    <span className="text-rose-400 text-[11px] font-bold">0% Score</span>
                   </div>
                 </div>
               </div>
@@ -1456,19 +1518,19 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Hydration</div>
+                    <div className="text-slate-400 text-[11px]">Hydration</div>
                     <div className="text-emerald-400 font-bold mt-0.5">3,000 ml</div>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Movement</div>
+                    <div className="text-slate-400 text-[11px]">Movement</div>
                     <div className="text-sky-400 font-bold mt-0.5">10,000 steps</div>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Gym Training</div>
+                    <div className="text-slate-400 text-[11px]">Gym Training</div>
                     <div className="text-amber-400 font-bold mt-0.5">45 min</div>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Sleep Recovery</div>
+                    <div className="text-slate-400 text-[11px]">Sleep Recovery</div>
                     <div className="text-purple-400 font-bold mt-0.5">8.0 hrs</div>
                   </div>
                 </div>
@@ -1489,21 +1551,21 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       <span className="text-emerald-400 font-bold">✓</span>
                       <span className="text-slate-200 font-medium">Clean Abstinence Maintained</span>
                     </div>
-                    <span className="text-emerald-400 text-[10px] font-bold">Streak +1</span>
+                    <span className="text-emerald-400 text-[11px] font-bold">Streak +1</span>
                   </div>
                   <div className="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800">
                     <div className="flex items-center gap-2">
                       <span className="text-rose-400 font-bold">✗</span>
                       <span className="text-slate-200 font-medium">Relapse / Distraction Trap</span>
                     </div>
-                    <span className="text-rose-400 text-[10px] font-bold">Penalty</span>
+                    <span className="text-rose-400 text-[11px] font-bold">Penalty</span>
                   </div>
                   <div className="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800">
                     <div className="flex items-center gap-2">
                       <span className="text-slate-400 font-bold">⏸</span>
                       <span className="text-slate-200 font-medium">Excused / Vacation Freeze</span>
                     </div>
-                    <span className="text-slate-400 text-[10px]">Protected</span>
+                    <span className="text-slate-400 text-[11px]">Protected</span>
                   </div>
                 </div>
               </div>
@@ -1514,11 +1576,11 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Deep Focus Block</div>
+                    <div className="text-slate-400 text-[11px]">Deep Focus Block</div>
                     <div className="text-emerald-400 font-bold mt-0.5">180 min</div>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Book Reading</div>
+                    <div className="text-slate-400 text-[11px]">Book Reading</div>
                     <div className="text-sky-400 font-bold mt-0.5">20 pages</div>
                   </div>
                 </div>
@@ -1535,19 +1597,19 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Primary Study</div>
+                    <div className="text-slate-400 text-[11px]">Primary Study</div>
                     <div className="text-emerald-400 font-bold mt-0.5">25 pages</div>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Technical Text</div>
+                    <div className="text-slate-400 text-[11px]">Technical Text</div>
                     <div className="text-sky-400 font-bold mt-0.5">20 pages</div>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Classical Works</div>
+                    <div className="text-slate-400 text-[11px]">Classical Works</div>
                     <div className="text-amber-400 font-bold mt-0.5">15 pages</div>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Fiction / Novels</div>
+                    <div className="text-slate-400 text-[11px]">Fiction / Novels</div>
                     <div className="text-purple-400 font-bold mt-0.5">30 pages</div>
                   </div>
                 </div>
@@ -1584,28 +1646,28 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       <span className="text-emerald-400 font-bold">✓</span>
                       <span className="text-slate-200">3 Balanced Meals + Fruits</span>
                     </div>
-                    <span className="text-emerald-400 text-[10px] font-bold">100% Score</span>
+                    <span className="text-emerald-400 text-[11px] font-bold">100% Score</span>
                   </div>
                   <div className="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800">
                     <div className="flex items-center gap-2">
                       <span className="text-sky-400 font-bold">•</span>
                       <span className="text-slate-200">2 Meals + Healthy Snacks</span>
                     </div>
-                    <span className="text-sky-400 text-[10px] font-bold">75% Score</span>
+                    <span className="text-sky-400 text-[11px] font-bold">75% Score</span>
                   </div>
                   <div className="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800">
                     <div className="flex items-center gap-2">
                       <span className="text-amber-400 font-bold">••</span>
                       <span className="text-slate-200">Picky / Partial Eating</span>
                     </div>
-                    <span className="text-amber-400 text-[10px] font-bold">50% Score</span>
+                    <span className="text-amber-400 text-[11px] font-bold">50% Score</span>
                   </div>
                   <div className="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800">
                     <div className="flex items-center gap-2">
                       <span className="text-rose-400 font-bold">✗</span>
                       <span className="text-slate-200">Refused Meals / Fussy</span>
                     </div>
-                    <span className="text-rose-400 text-[10px] font-bold">0% Score</span>
+                    <span className="text-rose-400 text-[11px] font-bold">0% Score</span>
                   </div>
                 </div>
               </div>
@@ -1616,19 +1678,19 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Milk / Formula</div>
+                    <div className="text-slate-400 text-[11px]">Milk / Formula</div>
                     <div className="text-emerald-400 font-bold mt-0.5">24 oz daily</div>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Night Sleep</div>
+                    <div className="text-slate-400 text-[11px]">Night Sleep</div>
                     <div className="text-sky-400 font-bold mt-0.5">10 - 11 hrs</div>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Daytime Nap</div>
+                    <div className="text-slate-400 text-[11px]">Daytime Nap</div>
                     <div className="text-purple-400 font-bold mt-0.5">90 min target</div>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="text-slate-400 text-[10px]">Storytime Books</div>
+                    <div className="text-slate-400 text-[11px]">Storytime Books</div>
                     <div className="text-amber-400 font-bold mt-0.5">3 books daily</div>
                   </div>
                 </div>
@@ -1638,7 +1700,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 <p className="font-semibold text-slate-300 text-[11px] uppercase tracking-wide">
                   Teeth Brushing & Tantrum Tracking:
                 </p>
-                <div className="space-y-1 bg-slate-950 p-2 rounded-lg border border-slate-800 text-[10px]">
+                <div className="space-y-1 bg-slate-950 p-2 rounded-lg border border-slate-800 text-[11px]">
                   <p className="text-slate-300">
                     <span className="text-emerald-400 font-bold">✓ 2x</span> Morning & Night • <span className="text-amber-400 font-bold">• 1x</span> Once today
                   </p>
@@ -1692,19 +1754,19 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 <div className="grid grid-cols-2 gap-1.5 text-[11px]">
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
                     <span className="text-emerald-400 font-bold">✓ Pain-Free</span>
-                    <span className="text-slate-400 text-[10px]">Comfortable</span>
+                    <span className="text-slate-400 text-[11px]">Comfortable</span>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
                     <span className="text-sky-400 font-bold">• Mild Cramps</span>
-                    <span className="text-slate-400 text-[10px]">Light ache</span>
+                    <span className="text-slate-400 text-[11px]">Light ache</span>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
                     <span className="text-amber-400 font-bold">•• Moderate</span>
-                    <span className="text-slate-400 text-[10px]">Pressure</span>
+                    <span className="text-slate-400 text-[11px]">Pressure</span>
                   </div>
                   <div className="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
                     <span className="text-rose-400 font-bold">✗ Severe Pain</span>
-                    <span className="text-slate-400 text-[10px]">Rest needed</span>
+                    <span className="text-slate-400 text-[11px]">Rest needed</span>
                   </div>
                 </div>
               </div>
@@ -1713,7 +1775,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 <p className="font-semibold text-slate-300 text-[11px] uppercase tracking-wide">
                   PMS Meltdown & Rage Tracking (Inverse):
                 </p>
-                <div className="bg-slate-950 p-2 rounded-lg border border-slate-800 text-[10px] space-y-1">
+                <div className="bg-slate-950 p-2 rounded-lg border border-slate-800 text-[11px] space-y-1">
                   <p className="text-slate-300">
                     <span className="text-emerald-400 font-bold">0 incidents:</span> 100% serene day • Emotional regulation intact.
                   </p>
@@ -1760,7 +1822,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 Review progress, monthly adjustments, and reading reflections for {currentMonth}.
               </p>
             </div>
-            <span className="text-[10px] text-emerald-400 font-mono">
+            <span className="text-[11px] text-emerald-400 tabular-nums">
               Auto-saved
             </span>
           </div>
@@ -1777,48 +1839,45 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
 
       {/* Floating Matrix Quick-Count Dock */}
       {selectedCell && (
-        <div className="fixed bottom-[max(env(safe-area-inset-bottom),16px)] left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-slate-900/95 backdrop-blur-xl border border-emerald-500/50 rounded-2xl p-3 sm:p-4 shadow-2xl ring-1 ring-white/10 text-slate-100 animate-fade-in">
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+49px+8px)] sm:bottom-[max(env(safe-area-inset-bottom),16px)] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-16px)] max-w-2xl max-h-[70vh] overflow-y-auto bg-slate-900/95 backdrop-blur-xl border border-emerald-500/40 rounded-2xl p-3 sm:p-4 shadow-2xl ring-1 ring-white/10 text-slate-100 animate-fade-in">
           {/* Dock Top Bar */}
           <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
-            <div className="flex items-center gap-2 flex-wrap min-w-0">
-              <div className="flex items-center gap-1.5 truncate">
-                <span className="font-bold text-white text-sm truncate">
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="font-semibold text-white text-[17px] truncate">
                   {selectedCell.habit.title}
                 </span>
                 {isSpiritualTemplate && selectedCell.habit.urduTitle && (
-                  <span className="text-emerald-400 text-xs font-arabic" dir="rtl">
+                  <span className="text-emerald-400 text-[15px] font-arabic shrink-0" dir="rtl">
                     {selectedCell.habit.urduTitle}
                   </span>
                 )}
               </div>
-
-              <div className="flex items-center gap-1.5">
-                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[11px] font-mono text-emerald-400 border border-slate-700 whitespace-nowrap">
-                  Day {selectedCell.day} • {selectedCell.date}
-                </span>
-                {showHijri && (
-                  <span className="text-[10px] text-amber-300 font-arabic whitespace-nowrap">
-                    {getHijriDate(selectedCell.date, hijriOffset).formatted}
-                  </span>
+              <p className="text-[13px] text-slate-400 mt-0.5 truncate">
+                {new Date(year, month - 1, selectedCell.day).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                {showHijri && isSpiritualTemplate && (
+                  <span className="text-emerald-400/80"> · {getHijriDate(selectedCell.date, hijriOffset).formatted}</span>
                 )}
-              </div>
+              </p>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => onCellClick(selectedCell.habit, selectedCell.date, selectedCell.day)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition"
+                className="flex items-center justify-center gap-1 min-w-[40px] h-10 px-2 sm:px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[13px] font-semibold transition"
                 title="Open full modal for notes and stopwatch"
+                aria-label="Details and notes"
               >
-                <ExternalLink className="w-3.5 h-3.5" />
+                <ExternalLink className="w-4 h-4" />
                 <span className="hidden sm:inline">Details & Notes</span>
               </button>
               <button
                 onClick={() => setSelectedCell(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
                 title="Close"
+                aria-label="Close"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -1855,9 +1914,8 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                         status: next >= (selectedCell.habit.targetValue || 1) ? 'COMPLETED' : (next > 0 ? 'PARTIAL' : 'FAILED'),
                         numericValue: next
                       });
-                      if (next >= (selectedCell.habit.targetValue || 1)) triggerCelebration();
                     }}
-                    className="w-16 bg-transparent text-center font-mono font-bold text-lg text-emerald-400 focus:outline-none"
+                    className="w-16 bg-transparent text-center tabular-nums font-bold text-lg text-emerald-400 focus:outline-none"
                   />
                   <span className="text-xs text-slate-400 font-medium">
                     {selectedCell.habit.unit || 'units'}
@@ -1872,7 +1930,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       status: next >= (selectedCell.habit.targetValue || 1) ? 'COMPLETED' : 'PARTIAL',
                       numericValue: next
                     });
-                    if (next >= (selectedCell.habit.targetValue || 1)) triggerCelebration();
                   }}
                   className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition active:scale-95"
                   title="Increase"
@@ -1895,7 +1952,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                             status: next >= (selectedCell.habit.targetValue || 1) ? 'COMPLETED' : 'PARTIAL',
                             numericValue: next
                           });
-                          triggerCelebration();
                         }}
                         className="px-2.5 py-1 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 font-bold text-xs transition active:scale-95"
                       >
@@ -1915,7 +1971,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                             status: next >= (selectedCell.habit.targetValue || 1) ? 'COMPLETED' : 'PARTIAL',
                             numericValue: next
                           });
-                          if (next >= (selectedCell.habit.targetValue || 1)) triggerCelebration();
                         }}
                         className="px-2.5 py-1 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 font-bold text-xs transition active:scale-95"
                       >
@@ -1933,7 +1988,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                         status: 'COMPLETED',
                         numericValue: target
                       });
-                      triggerCelebration();
                     }}
                     className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1 active:scale-95"
                   >
@@ -1998,7 +2052,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 </div>
 
                 {/* Conversion Display */}
-                <div className="text-[11px] font-mono text-slate-400">
+                <div className="text-[11px] tabular-nums text-slate-400">
                   {activeLog?.unitUsed === 'min' ? (
                     <span className="text-sky-300">
                       ≈ {Math.round(((activeLog?.numericValue || 0) * 5000) / 30).toLocaleString()} count
@@ -2030,7 +2084,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       >
                         <Minus className="w-4 h-4" />
                       </button>
-                      <span className="text-base font-bold text-sky-400 font-mono px-2">
+                      <span className="text-base font-bold text-sky-400 tabular-nums px-2">
                         {activeLog?.numericValue || 0} min
                       </span>
                       <button
@@ -2042,7 +2096,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                             status: next >= 30 ? 'COMPLETED' : 'PARTIAL',
                             numericValue: next
                           });
-                          if (next >= 30) triggerCelebration();
                         }}
                         className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200"
                       >
@@ -2061,7 +2114,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                               status: next >= 30 ? 'COMPLETED' : 'PARTIAL',
                               numericValue: next
                             });
-                            if (next >= 30) triggerCelebration();
                           }}
                           className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold"
                         >
@@ -2071,7 +2123,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       <button
                         onClick={() => {
                           handleQuickUpdate({ unitUsed: 'min', status: 'COMPLETED', numericValue: 30 });
-                          triggerCelebration();
                         }}
                         className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow"
                       >
@@ -2102,7 +2153,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       >
                         <Minus className="w-4 h-4" />
                       </button>
-                      <span className="text-base font-bold text-emerald-400 font-mono px-2">
+                      <span className="text-base font-bold text-emerald-400 tabular-nums px-2">
                         {(activeLog?.numericValue || 0).toLocaleString()} count
                       </span>
                       <button
@@ -2114,7 +2165,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                             status: next >= 5000 ? 'COMPLETED' : 'PARTIAL',
                             numericValue: next
                           });
-                          if (next >= 5000) triggerCelebration();
                         }}
                         className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200"
                       >
@@ -2133,7 +2183,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                               status: next >= 5000 ? 'COMPLETED' : 'PARTIAL',
                               numericValue: next
                             });
-                            if (next >= 5000) triggerCelebration();
                           }}
                           className="px-2 py-1 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 text-xs font-bold"
                         >
@@ -2143,7 +2192,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       <button
                         onClick={() => {
                           handleQuickUpdate({ unitUsed: 'count', status: 'COMPLETED', numericValue: 5000 });
-                          triggerCelebration();
                         }}
                         className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow"
                       >
@@ -2190,9 +2238,8 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                         status: next >= (selectedCell.habit.targetValue || 20) ? 'COMPLETED' : (next > 0 ? 'PARTIAL' : 'FAILED'),
                         numericValue: next
                       });
-                      if (next >= (selectedCell.habit.targetValue || 20)) triggerCelebration();
                     }}
-                    className="w-14 bg-transparent text-center font-mono font-bold text-lg text-sky-400 focus:outline-none"
+                    className="w-14 bg-transparent text-center tabular-nums font-bold text-lg text-sky-400 focus:outline-none"
                   />
                   <span className="text-xs text-slate-400 font-medium">min</span>
                 </div>
@@ -2204,7 +2251,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       status: next >= (selectedCell.habit.targetValue || 20) ? 'COMPLETED' : 'PARTIAL',
                       numericValue: next
                     });
-                    if (next >= (selectedCell.habit.targetValue || 20)) triggerCelebration();
                   }}
                   className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200"
                 >
@@ -2223,7 +2269,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                         status: next >= (selectedCell.habit.targetValue || 20) ? 'COMPLETED' : 'PARTIAL',
                         numericValue: next
                       });
-                      if (next >= (selectedCell.habit.targetValue || 20)) triggerCelebration();
                     }}
                     className="px-2.5 py-1 rounded-lg bg-sky-950 hover:bg-sky-900 border border-sky-800 text-sky-300 font-bold text-xs transition"
                   >
@@ -2237,7 +2282,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       status: 'COMPLETED',
                       numericValue: target
                     });
-                    triggerCelebration();
                   }}
                   className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow"
                 >
@@ -2260,7 +2304,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 <span className="text-xs text-slate-300 font-semibold">
                   Recorded Slips:
                 </span>
-                <span className={`font-mono font-bold text-base px-2.5 py-0.5 rounded-lg ${
+                <span className={`tabular-nums font-bold text-base px-2.5 py-0.5 rounded-lg ${
                   (activeLog?.numericValue || 0) === 0 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'
                 }`}>
                   {activeLog?.numericValue || 0} {selectedCell.habit.unit || 'slips'}
@@ -2274,7 +2318,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       status: 'COMPLETED',
                       numericValue: 0
                     });
-                    triggerCelebration();
                   }}
                   className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950 flex items-center gap-1.5 transition"
                 >
@@ -2320,7 +2363,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
           {/* 5. MULTI_STATE / SLOT (e.g. 5 Daily Prayers) */}
           {(selectedCell.habit.inputType === 'MULTI_STATE' || selectedCell.habit.inputType === 'SLOT') && selectedCell.habit.multiStates && (
             <div className="mt-2.5 bg-slate-950/80 p-2 rounded-xl border border-slate-800">
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 {selectedCell.habit.multiStates.map(state => {
                   const isSelected = activeLog?.stateCode === state.code;
                   const stateCount = logs.filter(l => l.habitId === selectedCell.habit.id && l.stateCode === state.code).length;
@@ -2328,7 +2371,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                   return (
                     <div
                       key={state.code}
-                      className={`px-2 py-1.5 rounded-xl border text-xs font-bold transition flex items-center justify-between gap-1 ${
+                      className={`pl-3 pr-1.5 min-h-[52px] rounded-xl border font-semibold transition flex items-center justify-between gap-2 ${
                         isSelected
                           ? `${state.bgClass} ring-1 ring-emerald-400 shadow-md`
                           : 'bg-slate-900 border-slate-800 text-slate-300'
@@ -2342,32 +2385,31 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                             stateCode: state.code,
                             numericValue: state.scoreWeight
                           });
-                          if (state.scoreWeight === 1.0) triggerCelebration();
                         }}
-                        className="flex items-center gap-1 min-w-0 flex-1 text-left"
-                        title={`Set Day ${selectedCell.day} to ${englishLabel}`}
+                        className="flex items-center gap-2.5 min-w-0 flex-1 text-left min-h-[48px]"
+                        title={`Set ${englishLabel} for this day`}
                       >
-                        <span className="text-sm shrink-0" style={{ color: state.color }}>{state.symbol}</span>
-                        <span className="truncate text-[11px]">{englishLabel}</span>
+                        <span className="text-[17px] w-5 text-center shrink-0" style={{ color: state.color }}>{state.symbol}</span>
+                        <span className="text-[15px] leading-tight">{englishLabel}</span>
                       </button>
 
-                      <div className="flex items-center gap-1 shrink-0 bg-slate-950/90 border border-slate-800 rounded-lg px-1 py-0.5">
+                      <div className="flex items-center gap-1 shrink-0 bg-slate-950/90 border border-slate-800 rounded-xl p-0.5">
                         <button
                           type="button"
                           onClick={() => handleAdjustMultiStateCount(selectedCell.habit, state.code, -1)}
-                          className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 active:scale-95"
-                          title={`Decrease ${englishLabel} count`}
+                          className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[17px] active:scale-95"
+                          aria-label={`Decrease ${englishLabel} count`}
                         >
                           −
                         </button>
-                        <span className="px-1 font-mono text-[11px] text-emerald-300 min-w-[18px] text-center">
+                        <span className="text-[15px] font-semibold tabular-nums text-emerald-300 min-w-[28px] text-center">
                           {stateCount}
                         </span>
                         <button
                           type="button"
                           onClick={() => handleAdjustMultiStateCount(selectedCell.habit, state.code, 1)}
-                          className="w-5 h-5 flex items-center justify-center rounded bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 active:scale-95"
-                          title={`Increase ${englishLabel} count`}
+                          className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 text-[17px] active:scale-95"
+                          aria-label={`Increase ${englishLabel} count`}
                         >
                           +
                         </button>
@@ -2391,7 +2433,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 >
                   <Minus className="w-4 h-4" />
                 </button>
-                <span className="text-base font-mono font-bold text-emerald-400 px-2">
+                <span className="text-base tabular-nums font-bold text-emerald-400 px-2">
                   {logs.filter(l => l.habitId === selectedCell.habit.id && l.status === 'COMPLETED').length} / {selectedCell.habit.cadence === 'FRIDAY_ONLY' ? fridayDays.length : daysInMonth}
                 </span>
                 <button
@@ -2407,7 +2449,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 <button
                   onClick={() => {
                     handleQuickUpdate({ status: 'COMPLETED', numericValue: 1 });
-                    triggerCelebration();
                   }}
                   className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1 ${
                     activeLog?.status === 'COMPLETED' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-emerald-950 hover:text-emerald-300'
@@ -2430,24 +2471,21 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
           )}
 
           {/* Dock Bottom Day Stepper Navigation */}
-          <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[15px]">
             <button
               onClick={() => handleSelectDay(selectedCell.day - 1)}
               disabled={selectedCell.day <= 1}
-              className="flex items-center gap-1 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-slate-300 font-semibold transition"
+              className="flex items-center gap-1 px-3 min-h-[40px] rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-slate-300 font-semibold transition"
             >
               <ChevronLeft className="w-4 h-4" />
               <span>{selectedCell.day > 1 ? `Day ${selectedCell.day - 1}` : 'Prev Day'}</span>
             </button>
 
-            <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
-              Tap cells or use +/- to edit counts directly
-            </span>
 
             <button
               onClick={() => handleSelectDay(selectedCell.day + 1)}
               disabled={selectedCell.day >= daysInMonth}
-              className="flex items-center gap-1 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-slate-300 font-semibold transition"
+              className="flex items-center gap-1 px-3 min-h-[40px] rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-slate-300 font-semibold transition"
             >
               <span>{selectedCell.day < daysInMonth ? `Day ${selectedCell.day + 1}` : 'Next Day'}</span>
               <ChevronRight className="w-4 h-4" />

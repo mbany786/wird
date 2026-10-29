@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { db } from './db';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from './types';
 import { TEMPLATES } from './data/templates';
-import { Header } from './components/Header';
+import { Header, VIEW_TABS } from './components/Header';
 import { MatrixGrid } from './components/MatrixGrid';
 import { DailyRoutineView } from './components/DailyRoutineView';
 import { BiAnalyticsDashboard } from './components/BiAnalyticsDashboard';
 import { CellEditorModal } from './components/CellEditorModal';
 import { TemplateCustomizerModal } from './components/TemplateCustomizerModal';
 import { downloadExcel, printPDF, getEmailReportUri } from './utils/exportUtils';
+import { todayStr, currentMonthStr } from './utils/date';
 
 export const App: React.FC = () => {
   const [templates, setTemplates] = useState<TrackerTemplate[]>(TEMPLATES);
@@ -19,8 +20,8 @@ export const App: React.FC = () => {
 
   // Navigation & View state
   const [activeView, setActiveView] = useState<'matrix' | 'daily' | 'bi' | 'customize'>('matrix');
-  const [currentMonth, setCurrentMonth] = useState<string>('2026-10');
-  const [selectedDate, setSelectedDate] = useState<string>('2026-10-29');
+  const [currentMonth, setCurrentMonth] = useState<string>(() => currentMonthStr());
+  const [selectedDate, setSelectedDate] = useState<string>(() => todayStr());
   const [monthlyRemarks, setMonthlyRemarks] = useState<string>('');
 
   // Hijri Calendar state (active by default for spiritual tracker)
@@ -392,7 +393,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 md:p-6 space-y-6 pb-[max(env(safe-area-inset-bottom),24px)]">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 pt-4 md:p-6 space-y-6 pb-[calc(env(safe-area-inset-bottom)+49px+24px)] sm:pb-[max(env(safe-area-inset-bottom),24px)]">
         {activeView === 'matrix' && (
           <MatrixGrid
             template={currentTemplate}
@@ -435,6 +436,31 @@ export const App: React.FC = () => {
           />
         )}
       </main>
+
+      {/* iPhone bottom tab bar (iPad/desktop show tabs in the header) */}
+      <nav
+        className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 pb-[env(safe-area-inset-bottom)]"
+        aria-label="Views"
+      >
+        <div className="flex h-[49px]">
+          {VIEW_TABS.map(({ id, label, Icon }) => {
+            const active = activeView === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveView(id)}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition ${
+                  active ? 'text-emerald-400' : 'text-slate-500'
+                }`}
+                aria-current={active ? 'page' : undefined}
+              >
+                <Icon className="w-6 h-6" strokeWidth={active ? 2.25 : 1.75} />
+                <span className="text-[11px] font-medium">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
       {/* Cell Editor Modal */}
       {cellModalData && (

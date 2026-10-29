@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { getHijriDate } from '../utils/hijri';
+import { todayStr, addDays, parseLocalDate } from '../utils/date';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -17,7 +18,6 @@ import {
   AlertTriangle,
   HeartPulse
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { analyzeMenstrualCycle } from '../utils/cycleEngine';
 
 interface DailyRoutineViewProps {
@@ -59,82 +59,66 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
   logs.filter(l => l.date === selectedDate).forEach(l => dailyLogsMap.set(l.habitId, l));
 
   // Determine if selected date is a Friday
-  const selectedDateObj = new Date(selectedDate);
-  const isFriday = selectedDateObj.getDay() === 5;
+  const isFriday = parseLocalDate(selectedDate).getDay() === 5;
+  const isToday = selectedDate === todayStr();
 
-  const handlePrevDay = () => {
-    const dt = new Date(selectedDate);
-    dt.setDate(dt.getDate() - 1);
-    onDateChange(dt.toISOString().split('T')[0]);
-  };
+  const handlePrevDay = () => onDateChange(addDays(selectedDate, -1));
+  const handleNextDay = () => onDateChange(addDays(selectedDate, 1));
+  const handleToday = () => onDateChange(todayStr());
 
-  const handleNextDay = () => {
-    const dt = new Date(selectedDate);
-    dt.setDate(dt.getDate() + 1);
-    onDateChange(dt.toISOString().split('T')[0]);
-  };
-
-  const handleToday = () => {
-    onDateChange(new Date().toISOString().split('T')[0]);
-  };
-
-  const triggerCelebration = () => {
-    try {
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.85 }
-      });
-    } catch (e) {
-      // Ignore in environments where canvas is restricted
-    }
-  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Date Navigation Bar */}
-      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-3.5 rounded-2xl shadow-xl">
+      <div className="flex items-center justify-between gap-2 bg-slate-900 border border-slate-800 px-2 py-3 rounded-2xl shadow-xl">
         <button
           onClick={handlePrevDay}
-          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+          className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
           title="Previous Day"
+          aria-label="Previous day"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleToday}
-            className="text-xs px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-400 font-semibold border border-emerald-800 hover:bg-emerald-900 transition"
-          >
-            Today
-          </button>
-          <div className="text-center">
-            <h2 className="text-base font-bold text-white tracking-wide">
-              {new Date(selectedDate + 'T00:00:00').toLocaleDateString(undefined, { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'short', 
-                day: 'numeric' 
-              })}
-            </h2>
-            {hijriDate && (
-              <p className="text-xs text-emerald-400 font-medium mt-0.5" dir="rtl">
-                {hijriDate.formattedArabic} ({hijriDate.formatted})
+        <div className="text-center min-w-0 flex-1">
+          <h2 className="text-[17px] font-semibold text-white">
+            {parseLocalDate(selectedDate).toLocaleDateString(undefined, {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            })}
+          </h2>
+          {hijriDate && (
+            <div className="mt-0.5 leading-snug">
+              <p className="text-[13px] text-emerald-400 font-medium" dir="ltr">
+                {hijriDate.formatted}
               </p>
-            )}
-            {isFriday && (
-              <span className="text-[11px] text-emerald-400 font-semibold uppercase tracking-wider block mt-0.5">
-                ★ Friday Routine Active {isSpiritualTemplate && '(جمعہ مبارک)'}
-              </span>
-            )}
-          </div>
+              <p className="text-[13px] text-emerald-400/80 font-arabic" dir="rtl" lang="ar">
+                {hijriDate.formattedArabic}
+              </p>
+            </div>
+          )}
+          {isFriday && (
+            <span className="text-[13px] text-emerald-400 font-medium block mt-0.5">
+              ★ Friday{isSpiritualTemplate && ' · جمعہ مبارک'}
+            </span>
+          )}
+          {!isToday && (
+            <button
+              onClick={handleToday}
+              className="mt-1.5 text-[13px] px-3 py-1 rounded-full bg-emerald-950 text-emerald-300 font-semibold border border-emerald-800 hover:bg-emerald-900 transition"
+            >
+              Back to Today
+            </button>
+          )}
         </div>
 
         <button
           onClick={handleNextDay}
-          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+          className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
           title="Next Day"
+          aria-label="Next day"
         >
           <ChevronRight className="w-5 h-5" />
         </button>
@@ -154,7 +138,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                     {cycleDailyInfo.phaseInfo.phaseName}
                   </span>
                   {cycleDailyInfo.phaseInfo.isPmsWindow && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-700 font-bold flex items-center gap-1">
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-700 font-bold flex items-center gap-1">
                       <AlertTriangle className="w-3 h-3 text-rose-400" />
                       PMS Alert Window
                     </span>
@@ -211,7 +195,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
               {/* Section Title */}
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400">
+                  <h3 className="text-[15px] font-semibold text-emerald-400">
                     {section.title}
                   </h3>
                   {isSpiritualTemplate && section.urduTitle && (
@@ -258,11 +242,11 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
 
                         <div className="flex items-center gap-1.5">
                           {isNegative ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 font-mono font-bold border border-emerald-800/60">
+                            <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 tabular-nums font-bold border border-emerald-800/60">
                               Inverse Track
                             </span>
                           ) : habit.unit && (
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono font-semibold">
+                            <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 tabular-nums font-semibold">
                               {habit.unit}
                             </span>
                           )}
@@ -274,7 +258,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                   onRemoveHabit(habit.id);
                                 }
                               }}
-                              className="p-1 rounded text-slate-600 hover:text-rose-400 hover:bg-slate-800 transition"
+                              className="hidden sm:block p-1 rounded text-slate-600 hover:text-rose-400 hover:bg-slate-800 transition"
                               title={`Remove ${habit.title}`}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -292,7 +276,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
                                 <div>
                                   <p className="text-xs font-bold text-emerald-300">Clean Day • 0 Incidents</p>
-                                  <p className="text-[10px] text-slate-400">Abstinence intact (100% score)</p>
+                                  <p className="text-[11px] text-slate-400">Abstinence intact (100% score)</p>
                                 </div>
                               </div>
 
@@ -320,7 +304,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                     <p className="text-xs font-bold text-rose-300">
                                       {incidents} {habit.inputType === 'DURATION' ? 'min' : (habit.unit || 'Incident(s)')} Logged
                                     </p>
-                                    <p className="text-[10px] text-slate-400">Inverse tracking penalizes score</p>
+                                    <p className="text-[11px] text-slate-400">Inverse tracking penalizes score</p>
                                   </div>
                                 </div>
 
@@ -346,7 +330,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                         date: selectedDate
                                       });
                                     }}
-                                    className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition"
+                                    className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition"
                                     title="Reset to 0 incidents"
                                   >
                                     Reset to 0
@@ -373,18 +357,17 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                     numericValue: state.scoreWeight,
                                     date: selectedDate
                                   });
-                                  if (state.scoreWeight === 1.0) triggerCelebration();
                                 }}
-                                className={`flex flex-col items-center justify-center p-2 rounded-lg border text-xs font-bold transition ${
+                                className={`flex flex-col items-center justify-center min-h-[52px] px-1 py-1.5 rounded-xl border font-semibold transition ${
                                   isSelected 
                                     ? `${state.bgClass} ring-1 ring-emerald-400 shadow-md` 
                                     : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                                 }`}
                                 title={state.label}
                               >
-                                <span className="text-sm">{state.symbol}</span>
-                                <span className="text-[9px] mt-0.5 font-normal truncate max-w-full">
-                                  {state.code.split('_')[0]}
+                                <span className="text-[15px] leading-none">{state.symbol}</span>
+                                <span className="text-[12px] mt-1 font-medium leading-none">
+                                  {(() => { const w = state.code.split('_')[0].toLowerCase(); return w.charAt(0).toUpperCase() + w.slice(1); })()}
                                 </span>
                               </button>
                             );
@@ -411,7 +394,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                               <Minus className="w-3.5 h-3.5" />
                             </button>
 
-                            <span className="text-base font-bold text-emerald-400 font-mono px-2">
+                            <span className="text-base font-bold text-emerald-400 tabular-nums px-2">
                               {log?.numericValue || 0}
                             </span>
 
@@ -424,7 +407,6 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                   numericValue: next,
                                   date: selectedDate
                                 });
-                                if (next >= (habit.targetValue || 1)) triggerCelebration();
                               }}
                               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
                             >
@@ -444,7 +426,6 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                     numericValue: next,
                                     date: selectedDate
                                   });
-                                  triggerCelebration();
                                 }}
                                 className="px-2 py-1 rounded-lg bg-emerald-950 text-emerald-300 font-bold text-[11px] border border-emerald-800 hover:bg-emerald-900"
                               >
@@ -478,25 +459,25 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                             <div>
                               {log?.unitUsed === 'min' ? (
                                 <div className="flex items-baseline gap-1.5">
-                                  <span className="text-base font-bold text-sky-400 font-mono">
+                                  <span className="text-base font-bold text-sky-400 tabular-nums">
                                     {log.numericValue || 0} min
                                   </span>
-                                  <span className="text-[10px] text-slate-400 font-medium">
+                                  <span className="text-[11px] text-slate-400 font-medium">
                                     ≈ {Math.round(((log.numericValue || 0) * 5000) / 30).toLocaleString()} count
                                   </span>
                                 </div>
                               ) : (
                                 <div className="flex items-baseline gap-1.5">
-                                  <span className="text-base font-bold text-emerald-400 font-mono">
+                                  <span className="text-base font-bold text-emerald-400 tabular-nums">
                                     {(log?.numericValue || 0).toLocaleString()} count
                                   </span>
-                                  <span className="text-[10px] text-slate-400 font-medium">
+                                  <span className="text-[11px] text-slate-400 font-medium">
                                     ≈ {Math.round(((log?.numericValue || 0) * 30) / 5000)} min
                                   </span>
                                 </div>
                               )}
                             </div>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 tabular-nums">
                               5k = 30m
                             </span>
                           </div>
@@ -513,7 +494,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                   date: selectedDate
                                 });
                               }}
-                              className="px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-semibold text-slate-300 transition"
+                              className="px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 transition"
                             >
                               2.5k (15m)
                             </button>
@@ -527,9 +508,8 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                   unitUsed: 'count',
                                   date: selectedDate
                                 });
-                                triggerCelebration();
                               }}
-                              className="px-1.5 py-1 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-[10px] font-bold text-emerald-300 transition"
+                              className="px-1.5 py-1 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-[11px] font-bold text-emerald-300 transition"
                             >
                               5k (30m) ✓
                             </button>
@@ -543,9 +523,8 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                   unitUsed: 'count',
                                   date: selectedDate
                                 });
-                                triggerCelebration();
                               }}
-                              className="px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-semibold text-slate-300 transition"
+                              className="px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 transition"
                             >
                               7.5k (45m)
                             </button>
@@ -559,9 +538,8 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                   unitUsed: 'count',
                                   date: selectedDate
                                 });
-                                triggerCelebration();
                               }}
-                              className="px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-semibold text-slate-300 transition"
+                              className="px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 transition"
                             >
                               10k (60m)
                             </button>
@@ -573,10 +551,10 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                       {habit.inputType === 'DURATION' && (
                         <div className="flex items-center justify-between bg-slate-900 p-2 rounded-xl border border-slate-800">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-mono font-bold text-sky-400">
+                            <span className="text-sm tabular-nums font-bold text-sky-400">
                               {log?.numericValue || 0} min
                             </span>
-                            <span className="text-[10px] text-slate-500">
+                            <span className="text-[11px] text-slate-500">
                               / {habit.targetValue || 20}m target
                             </span>
                           </div>
@@ -591,7 +569,6 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                     numericValue: mins,
                                     date: selectedDate
                                   });
-                                  if (mins >= (habit.targetValue || 20)) triggerCelebration();
                                 }}
                                 className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
                               >
@@ -617,7 +594,6 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                 numericValue: newStatus === 'COMPLETED' ? 1 : 0,
                                 date: selectedDate
                               });
-                              if (newStatus === 'COMPLETED') triggerCelebration();
                             }}
                             className={`p-1.5 rounded-xl transition ${
                               isDone 

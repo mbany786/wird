@@ -212,7 +212,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                     <AlertTriangle className="w-4 h-4 text-rose-400" />
                     <span>Log Incidents / Slips</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-mono">Penalizes score</span>
+                  <span className="text-[11px] text-slate-400 tabular-nums">Penalizes score</span>
                 </div>
 
                 {/* Counter controls */}
@@ -225,7 +225,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                     >
                       <Minus className="w-4 h-4" />
                     </button>
-                    <span className="text-xl font-bold text-rose-400 font-mono min-w-[40px] text-center">
+                    <span className="text-xl font-bold text-rose-400 tabular-nums min-w-[40px] text-center">
                       {negativeIncidents || 1}
                     </span>
                     <button
@@ -601,7 +601,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
           {habit.inputType === 'DURATION' && (
             <div className="space-y-4">
               <div className="text-center py-5 bg-slate-950 rounded-xl border border-slate-800">
-                <div className="text-4xl font-mono font-bold text-emerald-400 tracking-wider">
+                <div className="text-4xl tabular-nums font-bold text-emerald-400 tracking-wider">
                   {formatTimer(timerSeconds)}
                 </div>
                 <p className="text-xs text-slate-400 mt-1">

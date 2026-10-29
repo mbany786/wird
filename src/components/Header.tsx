@@ -1,12 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { TrackerTemplate } from '../types';
 import { getHijriDate } from '../utils/hijri';
-import { 
-  ShieldCheck, 
-  Calendar, 
-  LayoutGrid, 
-  CheckSquare, 
-  BarChart3, 
+import {
+  Calendar,
+  LayoutGrid,
+  CheckSquare,
+  BarChart3,
   SlidersHorizontal,
   Moon,
   Activity,
@@ -18,8 +17,12 @@ import {
   PlusCircle,
   FileSpreadsheet,
   Printer,
-  Mail
+  Mail,
+  ChevronDown,
+  Ellipsis
 } from 'lucide-react';
+
+export type AppView = 'matrix' | 'daily' | 'bi' | 'customize';
 
 interface HeaderProps {
   currentTemplate: TrackerTemplate;
@@ -27,8 +30,8 @@ interface HeaderProps {
   onSelectTemplate: (t: TrackerTemplate) => void;
   currentMonth: string; // YYYY-MM
   onMonthChange: (m: string) => void;
-  activeView: 'matrix' | 'daily' | 'bi' | 'customize';
-  onViewChange: (view: 'matrix' | 'daily' | 'bi' | 'customize') => void;
+  activeView: AppView;
+  onViewChange: (view: AppView) => void;
   onOpenCustomizer: () => void;
   showHijri: boolean;
   onToggleHijri: () => void;
@@ -39,6 +42,26 @@ interface HeaderProps {
   onEmailReport: () => void;
   onCreateBlankTemplate?: () => void;
 }
+
+export const VIEW_TABS: { id: AppView; label: string; Icon: typeof LayoutGrid }[] = [
+  { id: 'matrix', label: 'Matrix', Icon: LayoutGrid },
+  { id: 'daily', label: 'Daily', Icon: CheckSquare },
+  { id: 'bi', label: 'Analytics', Icon: BarChart3 }
+];
+
+const getIcon = (iconName: string) => {
+  const cls = 'w-5 h-5';
+  switch (iconName) {
+    case 'Moon': return <Moon className={`${cls} text-emerald-400`} />;
+    case 'Activity': return <Activity className={`${cls} text-sky-400`} />;
+    case 'Brain': return <Brain className={`${cls} text-purple-400`} />;
+    case 'BookOpen': return <BookOpen className={`${cls} text-amber-400`} />;
+    case 'Baby': return <Baby className={`${cls} text-pink-400`} />;
+    case 'HeartPulse': return <HeartPulse className={`${cls} text-rose-400`} />;
+    case 'PlusCircle': return <PlusCircle className={`${cls} text-emerald-400`} />;
+    default: return <Sparkles className={`${cls} text-emerald-400`} />;
+  }
+};
 
 export const Header: React.FC<HeaderProps> = ({
   currentTemplate,
@@ -58,225 +81,191 @@ export const Header: React.FC<HeaderProps> = ({
   onEmailReport,
   onCreateBlankTemplate
 }) => {
-  const getIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'Moon': return <Moon className="w-5 h-5 text-emerald-400" />;
-      case 'Activity': return <Activity className="w-5 h-5 text-sky-400" />;
-      case 'Brain': return <Brain className="w-5 h-5 text-purple-400" />;
-      case 'BookOpen': return <BookOpen className="w-5 h-5 text-amber-400" />;
-      case 'Baby': return <Baby className="w-5 h-5 text-pink-400" />;
-      case 'HeartPulse': return <HeartPulse className="w-5 h-5 text-rose-400" />;
-      case 'Sparkles': return <Sparkles className="w-5 h-5 text-amber-400" />;
-      case 'PlusCircle': return <PlusCircle className="w-5 h-5 text-emerald-400" />;
-      default: return <Sparkles className="w-5 h-5 text-emerald-400" />;
-    }
-  };
-
+  const [menuOpen, setMenuOpen] = useState(false);
   const isSpiritualTemplate = currentTemplate.id === 'daily_spiritual_schedule';
   const midMonthHijri = isSpiritualTemplate && showHijri ? getHijriDate(`${currentMonth}-15`, hijriOffset) : null;
 
+  const runAndClose = (fn: () => void) => () => {
+    setMenuOpen(false);
+    fn();
+  };
+
   return (
-    <header className="bg-slate-900/95 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-md px-3 sm:px-4 pt-[max(env(safe-area-inset-top),16px)] pb-3 space-y-2.5">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
-        {/* Title, Template Badge & Switcher */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 sm:p-2.5 rounded-xl bg-slate-800/90 border border-slate-700/80 shadow-inner">
-              {getIcon(currentTemplate.icon)}
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <h1 className="text-sm sm:text-base md:text-lg font-bold text-slate-100 tracking-tight">
-                  {currentTemplate.title}
-                </h1>
-                <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-800 font-medium">
-                  {currentTemplate.badge}
-                </span>
-              </div>
-              {isSpiritualTemplate && currentTemplate.urduTitle && (
-                <p className="text-xs text-emerald-400 font-medium font-arabic mt-0.5" dir="rtl">
-                  {currentTemplate.urduTitle}
-                </p>
-              )}
-            </div>
+    <header className="bg-slate-900/95 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-md px-4 pt-[max(env(safe-area-inset-top),12px)] pb-2">
+      <div className="max-w-7xl mx-auto">
+        {/* Row 1: template title (doubles as switcher) + tabs (tablet/desktop) + actions */}
+        <div className="flex items-center gap-2 h-11">
+          <div className="hidden sm:flex p-2 rounded-xl bg-slate-800/90 border border-slate-700/80 shrink-0">
+            {getIcon(currentTemplate.icon)}
           </div>
 
-          {/* Quick Template Switcher on mobile/desktop right */}
-          <div className="flex items-center gap-1.5">
-            <select 
+          {/* Title acts as the template picker: a native select sits invisibly on top of it */}
+          <div className="relative min-w-0 flex-1 sm:flex-none">
+            <div className="flex items-center gap-1 min-w-0 pointer-events-none">
+              <h1 className="text-[17px] font-semibold text-slate-50 truncate">
+                {currentTemplate.title}
+              </h1>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+            <select
+              aria-label="Switch tracker template"
               value={currentTemplate.id}
               onChange={(e) => {
                 if (e.target.value === '__NEW_BLANK__') {
-                  if (onCreateBlankTemplate) onCreateBlankTemplate();
+                  onCreateBlankTemplate?.();
                 } else {
                   const selected = templates.find(t => t.id === e.target.value);
                   if (selected) onSelectTemplate(selected);
                 }
               }}
-              className="bg-slate-800/90 border border-slate-700/80 text-slate-200 text-xs rounded-lg px-2 sm:px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer font-medium max-w-[150px] sm:max-w-none truncate"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             >
-              <optgroup label="Available Templates">
+              <optgroup label="Templates">
                 {templates.map(t => (
-                  <option key={t.id} value={t.id} className="bg-slate-900 text-slate-200">
-                    {t.title}
-                  </option>
+                  <option key={t.id} value={t.id}>{t.title}</option>
                 ))}
               </optgroup>
-              <optgroup label="Blank & Custom Tracker">
-                <option value="__NEW_BLANK__" className="bg-slate-900 text-emerald-400 font-bold">
-                  + Create New Blank Template...
-                </option>
+              <optgroup label="New">
+                <option value="__NEW_BLANK__">+ Create blank template…</option>
               </optgroup>
             </select>
+          </div>
 
+          <span className="hidden md:inline text-xs px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-800 font-medium shrink-0">
+            {currentTemplate.badge}
+          </span>
+
+          {/* View tabs (iPad / desktop). iPhone uses the bottom tab bar instead. */}
+          <nav className="hidden sm:flex ml-auto bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[13px]">
+            {VIEW_TABS.map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                onClick={() => onViewChange(id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition font-medium ${
+                  activeView === id ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-1 ml-auto sm:ml-2 shrink-0">
             <button
               type="button"
               onClick={onOpenCustomizer}
-              className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap"
-              title="Edit template, add custom sections/tasks, or generate habits via prompt"
+              className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition"
+              title="Template Studio: edit sections and tasks"
+              aria-label="Open Template Studio"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Studio</span>
+              <SlidersHorizontal className="w-5 h-5 text-emerald-400" />
             </button>
-          </div>
-        </div>
 
-        {/* Action Controls & Navigation */}
-        <div className="flex flex-wrap items-center justify-between md:justify-end gap-2 pt-1 md:pt-0 border-t md:border-t-0 border-slate-800/60">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {/* Month Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 px-2 py-1.5 rounded-lg text-xs font-medium text-slate-200">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              <input 
-                type="month"
-                value={currentMonth}
-                onChange={(e) => onMonthChange(e.target.value)}
-                className="bg-transparent text-slate-200 focus:outline-none cursor-pointer text-xs"
-              />
-              {midMonthHijri && (
-                <span className="text-[10px] text-emerald-300 font-semibold border-l border-slate-700 pl-1.5 hidden sm:inline">
-                  {midMonthHijri.monthName} {midMonthHijri.year} AH
-                </span>
-              )}
-            </div>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen(o => !o)}
+                className={`relative z-50 w-10 h-10 flex items-center justify-center rounded-xl transition ${
+                  menuOpen ? 'bg-slate-800 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+                title="More: Hijri settings and export"
+                aria-label="More options"
+                aria-expanded={menuOpen}
+              >
+                <Ellipsis className="w-5 h-5" />
+              </button>
 
-            {/* Hijri Calendar Option (Only for Spiritual Schedule) */}
-            {isSpiritualTemplate && (
-              <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-lg p-0.5 text-xs">
-                <button
-                  type="button"
-                  onClick={onToggleHijri}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md transition font-semibold text-xs ${
-                    showHijri 
-                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 shadow-sm' 
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                  title="Toggle Hijri Calendar dates across table and daily views"
-                >
-                  <Moon className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Hijri</span>
-                  <span className={`text-[9px] px-1 py-0.2 rounded font-mono font-bold ${showHijri ? 'bg-emerald-800 text-white' : 'bg-slate-700 text-slate-400'}`}>
-                    {showHijri ? 'ON' : 'OFF'}
-                  </span>
-                </button>
+              {menuOpen && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Close menu"
+                    className="fixed inset-0 z-40 cursor-default"
+                    onClick={() => setMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 top-12 z-50 w-64 rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl p-1.5 text-[15px]">
+                    {isSpiritualTemplate && (
+                      <div className="px-2.5 py-2 border-b border-slate-800 mb-1">
+                        <button
+                          type="button"
+                          onClick={onToggleHijri}
+                          className="w-full flex items-center justify-between min-h-[40px]"
+                        >
+                          <span className="flex items-center gap-2.5 text-slate-200">
+                            <Moon className="w-4 h-4 text-emerald-400" />
+                            Hijri dates
+                          </span>
+                          <span
+                            className={`w-11 h-6 rounded-full p-0.5 transition ${showHijri ? 'bg-emerald-600' : 'bg-slate-700'}`}
+                            aria-hidden
+                          >
+                            <span className={`block w-5 h-5 rounded-full bg-white transition ${showHijri ? 'translate-x-5' : ''}`} />
+                          </span>
+                        </button>
 
-                {showHijri && (
-                  <div className="flex items-center gap-0.5 pl-1 pr-1 border-l border-slate-700/80 ml-0.5">
-                    <span className="text-[9px] text-slate-400 mr-0.5">Adj:</span>
-                    {[-1, 0, 1].map(offset => (
+                        {showHijri && (
+                          <div className="flex items-center justify-between mt-1.5">
+                            <span className="text-[13px] text-slate-400">Moon-sighting adjustment</span>
+                            <div className="flex bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+                              {[-1, 0, 1].map(offset => (
+                                <button
+                                  key={offset}
+                                  type="button"
+                                  onClick={() => onOffsetChange(offset)}
+                                  className={`w-9 h-8 rounded-md text-[13px] font-semibold tabular-nums transition ${
+                                    hijriOffset === offset ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:bg-slate-800'
+                                  }`}
+                                  aria-label={`Hijri adjustment ${offset > 0 ? '+' : ''}${offset} day`}
+                                >
+                                  {offset > 0 ? `+${offset}` : offset}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {[
+                      { label: 'Export to Excel', Icon: FileSpreadsheet, fn: onExportExcel },
+                      { label: 'Print or save PDF', Icon: Printer, fn: onPrintPDF },
+                      { label: 'Email monthly report', Icon: Mail, fn: onEmailReport }
+                    ].map(({ label, Icon, fn }) => (
                       <button
-                        key={offset}
+                        key={label}
                         type="button"
-                        onClick={() => onOffsetChange(offset)}
-                        className={`px-1 py-0.5 rounded text-[9px] font-mono font-bold transition ${
-                          hijriOffset === offset 
-                            ? 'bg-emerald-600 text-white' 
-                            : 'text-slate-400 hover:bg-slate-700'
-                        }`}
-                        title={`Hijri sighting adjustment: ${offset > 0 ? '+' : ''}${offset} day`}
+                        onClick={runAndClose(fn)}
+                        className="w-full flex items-center gap-2.5 px-2.5 min-h-[44px] rounded-xl text-slate-200 hover:bg-slate-800 transition text-left"
                       >
-                        {offset > 0 ? `+${offset}` : offset}
+                        <Icon className="w-4 h-4 text-slate-400" />
+                        {label}
                       </button>
                     ))}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {/* View Mode Tabs */}
-            <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs">
-              <button
-                onClick={() => onViewChange('matrix')}
-                className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md transition font-medium ${
-                  activeView === 'matrix' 
-                    ? 'bg-emerald-600 text-white shadow-sm' 
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Full 31-Day Density Matrix"
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">31-Day</span> Matrix
-              </button>
-
-              <button
-                onClick={() => onViewChange('daily')}
-                className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md transition font-medium ${
-                  activeView === 'daily' 
-                    ? 'bg-emerald-600 text-white shadow-sm' 
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Day Focus & Routine Stream"
-              >
-                <CheckSquare className="w-3.5 h-3.5" />
-                <span>Daily</span>
-              </button>
-
-              <button
-                onClick={() => onViewChange('bi')}
-                className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md transition font-medium ${
-                  activeView === 'bi' 
-                    ? 'bg-emerald-600 text-white shadow-sm' 
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="BI Analytics, Trends & Correlations"
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span>Analytics</span>
-              </button>
-            </div>
-
-            {/* Export & Download Controls (Excel, PDF, Email) */}
-            <div className="flex items-center bg-slate-800/90 border border-slate-700/80 p-0.5 rounded-lg text-xs">
-              <button
-                onClick={onExportExcel}
-                className="flex items-center gap-1 p-1 sm:px-2 sm:py-1 rounded text-slate-300 hover:text-emerald-400 hover:bg-slate-700 transition"
-                title="Download formatted Excel (.xlsx) schedule"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="hidden md:inline">Excel</span>
-              </button>
-
-              <button
-                onClick={onPrintPDF}
-                className="flex items-center gap-1 p-1 sm:px-2 sm:py-1 rounded text-slate-300 hover:text-sky-400 hover:bg-slate-700 transition"
-                title="Print or Save as PDF"
-              >
-                <Printer className="w-3.5 h-3.5 text-sky-400" />
-                <span className="hidden md:inline">PDF</span>
-              </button>
-
-              <button
-                onClick={onEmailReport}
-                className="flex items-center gap-1 p-1 sm:px-2 sm:py-1 rounded text-slate-300 hover:text-amber-400 hover:bg-slate-700 transition"
-                title="Email Monthly Tracking Report"
-              >
-                <Mail className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden md:inline">Email</span>
-              </button>
+                </>
+              )}
             </div>
           </div>
+        </div>
+
+        {/* Row 2: month picker + Hijri month */}
+        <div className="flex items-center gap-2 mt-1">
+          <label className="flex items-center gap-1.5 text-[15px] text-slate-300">
+            <Calendar className="w-4 h-4 text-slate-500" />
+            <input
+              type="month"
+              value={currentMonth}
+              onChange={(e) => e.target.value && onMonthChange(e.target.value)}
+              className="bg-transparent text-slate-200 focus:outline-none cursor-pointer font-medium"
+              aria-label="Month"
+            />
+          </label>
+          {midMonthHijri && (
+            <span className="text-[13px] text-emerald-400/90 truncate">
+              · {midMonthHijri.monthName} {midMonthHijri.year} AH
+            </span>
+          )}
         </div>
       </div>
     </header>

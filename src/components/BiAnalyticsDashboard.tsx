@@ -289,19 +289,19 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Habit Strength Rankings */}
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-100 flex items-center gap-2">
-                <BarChart2 className="w-4 h-4 text-emerald-400" />
-                <span>Habit Strength Retention Curves</span>
+          <div className="pb-3 border-b border-slate-800">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-[17px] font-semibold text-slate-100 flex items-center gap-2">
+                <BarChart2 className="w-5 h-5 text-emerald-400" />
+                <span>Habit Strength</span>
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Exponential memory decay (21-day half-life). Single missed days do not reset progress.
-              </p>
+              <span className="text-[13px] text-slate-400 tabular-nums whitespace-nowrap">
+                {summaries.length} habits
+              </span>
             </div>
-            <span className="text-xs font-semibold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-800">
-              {summaries.length} Habits Tracked
-            </span>
+            <p className="text-[13px] text-slate-400 mt-1">
+              Builds with consistency and fades slowly (21-day half-life), so one missed day won't reset your progress.
+            </p>
           </div>
 
           <div className="space-y-3">
@@ -314,7 +314,7 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
                       <span className="text-[11px] text-emerald-400" dir="rtl">{habit.urduTitle}</span>
                     )}
                     {habit.unit && (
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 tabular-nums">
                         {habit.unit}
                       </span>
                     )}
@@ -324,7 +324,7 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
                     <span className="text-slate-400 text-[11px]">
                       {summary.totalLoggedDays} logs
                     </span>
-                    <span className="font-mono font-bold text-emerald-400 text-sm">
+                    <span className="tabular-nums font-bold text-emerald-400 text-sm">
                       {summary.strengthScore}%
                     </span>
                   </div>
@@ -349,7 +349,7 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
         <div className="space-y-6">
           {/* Top Active Streaks */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <h3 className="text-[15px] font-semibold text-slate-200 flex items-center gap-2">
               <Flame className="w-4 h-4 text-amber-400" />
               <span>Current Unbroken Streaks</span>
             </h3>
@@ -371,7 +371,7 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
 
           {/* Cross-Habit Correlation Insights */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <h3 className="text-[15px] font-semibold text-slate-200 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-sky-400" />
               <span>Habit Correlation Engine</span>
             </h3>
@@ -385,12 +385,12 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
                   <div key={idx} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1">
                     <div className="flex items-center justify-between text-slate-300">
                       <span className="font-semibold truncate max-w-[150px]">{c.habitA}</span>
-                      <span className="text-slate-500 font-mono">⟷</span>
+                      <span className="text-slate-500 tabular-nums">⟷</span>
                       <span className="font-semibold truncate max-w-[150px]">{c.habitB}</span>
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-slate-400">
                       <span>Pearson Correlation (r):</span>
-                      <span className={`font-mono font-bold ${c.score > 0.5 ? 'text-emerald-400' : 'text-sky-400'}`}>
+                      <span className={`tabular-nums font-bold ${c.score > 0.5 ? 'text-emerald-400' : 'text-sky-400'}`}>
                         +{c.score} (Strong Catalyst)
                       </span>
                     </div>
