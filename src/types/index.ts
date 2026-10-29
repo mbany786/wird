@@ -53,6 +53,9 @@ export interface HabitLog {
   numericValue?: number;
   stateCode?: string;
   unitUsed?: 'count' | 'min'; // For dual Lataif tracking (5000 count = 30 min)
+  /** Optional user-entered amount for habits whose main value is a status (done / prayer state) */
+  amount?: number;
+  amountUnit?: 'count' | 'min';
   notes?: string;
   timestamp: number;
 }

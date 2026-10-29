@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { todayStr } from '../utils/date';
+import { shortExtraAmount, formatExtraAmount } from '../utils/amount';
+import { AmountEntry } from './AmountEntry';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { calculateMonthSummary } from '../utils/analytics';
 import { getHijriDate } from '../utils/hijri';
@@ -375,8 +377,21 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
     return map;
   }, [sections, habits]);
 
-  // Render cell content
+  // Render cell content: core symbol/value plus any custom count/minutes underneath
   const renderCellContent = (habit: Habit, day: number) => {
+    const log = logMap.get(`${habit.id}:${currentMonth}-${String(day).padStart(2, '0')}`);
+    const extra = shortExtraAmount(log);
+    const core = renderCellCore(habit, day);
+    if (!extra) return core;
+    return (
+      <span className="flex flex-col items-center leading-none" title={formatExtraAmount(log)}>
+        {log?.status === 'SKIPPED' && !log.stateCode ? null : core}
+        <span className="text-[11px] font-semibold text-slate-300 tabular-nums mt-0.5">{extra}</span>
+      </span>
+    );
+  };
+
+  const renderCellCore = (habit: Habit, day: number) => {
     const dateStr = `${currentMonth}-${String(day).padStart(2, '0')}`;
     const log = logMap.get(`${habit.id}:${dateStr}`);
     const isFriday = fridayDays.includes(day);
@@ -1112,7 +1127,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                 }`}
                                 title={`Day ${d}: Tap to edit count`}
                               >
-                                <div className="w-full h-7 flex items-center justify-center">
+                                <div className="w-full min-h-[28px] flex items-center justify-center">
                                   {renderCellContent(habit, d)}
                                 </div>
                               </td>
@@ -2468,6 +2483,16 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 </button>
               </div>
             </div>
+          )}
+
+          {/* Custom count / minutes (pages & minutes habits already have a typed field above) */}
+          {selectedCell.habit.inputType !== 'QUANTITY' && selectedCell.habit.inputType !== 'DURATION' && (
+            <AmountEntry
+              variant="inline"
+              habit={selectedCell.habit}
+              log={activeLog}
+              onSave={(update) => handleQuickUpdate(update)}
+            />
           )}
 
           {/* Dock Bottom Day Stepper Navigation */}

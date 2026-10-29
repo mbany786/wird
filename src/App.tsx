@@ -137,22 +137,24 @@ export const App: React.FC = () => {
     const targetDate = logData.date || selectedDate;
     const existingLogIndex = logs.findIndex(l => l.habitId === habitId && l.date === targetDate);
 
+    let existing: HabitLog | undefined = existingLogIndex >= 0 ? logs[existingLogIndex] : undefined;
+    if (!existing) {
+      existing = await db.logs.where({ habitId, date: targetDate }).first();
+    }
+    const existingId = existing?.id;
+
+    // Merge into the existing entry so fields not part of this update (notes, custom amount,
+    // Lataif unit, prayer state…) survive. Keys passed explicitly as undefined still clear.
     const logToSave: HabitLog = {
+      ...(existing ?? {}),
+      ...logData,
       habitId,
       date: targetDate,
-      status: logData.status || 'COMPLETED',
-      numericValue: logData.numericValue ?? 0,
-      stateCode: logData.stateCode,
-      unitUsed: logData.unitUsed,
-      notes: logData.notes,
+      status: logData.status ?? existing?.status ?? 'COMPLETED',
+      numericValue: 'numericValue' in logData ? (logData.numericValue ?? 0) : (existing?.numericValue ?? 0),
       timestamp: Date.now()
     };
-
-    let existingId = existingLogIndex >= 0 ? logs[existingLogIndex].id : undefined;
-    if (!existingId) {
-      const dbRecord = await db.logs.where({ habitId, date: targetDate }).first();
-      if (dbRecord) existingId = dbRecord.id;
-    }
+    delete logToSave.id;
 
     if (existingId) {
       logToSave.id = existingId;

@@ -68,6 +68,13 @@ export function downloadExcel(
         } else {
           row.push(log.status === 'COMPLETED' ? '✓' : '✗');
         }
+
+        // Append any custom count / minutes entered for status habits, e.g. "✓ 25m"
+        if (log?.amount) {
+          const extra = `${log.amount}${log.amountUnit === 'min' ? 'm' : ''}`;
+          const last = row.length - 1;
+          row[last] = row[last] === '' || row[last] === 'SKIPPED' ? extra : `${row[last]} ${extra}`;
+        }
       }
 
       // Summary column text

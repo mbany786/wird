@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { getHijriDate } from '../utils/hijri';
 import { todayStr, addDays, parseLocalDate } from '../utils/date';
+import { AmountEntry } from './AmountEntry';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -611,6 +612,13 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                       )}
                     </>
                   )}
+
+                  {/* Custom count / minutes for any habit */}
+                  <AmountEntry
+                    habit={habit}
+                    log={log}
+                    onSave={(update) => onUpdateLog(habit.id, { ...update, date: selectedDate })}
+                  />
                 </div>
                   );
                 })}
