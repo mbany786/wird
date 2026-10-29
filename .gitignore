@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# iOS build artifacts
+ios/build/
+ios/App/Pods/
+ios/App/build/

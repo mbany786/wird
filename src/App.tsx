@@ -120,12 +120,19 @@ export const App: React.FC = () => {
       status: logData.status || 'COMPLETED',
       numericValue: logData.numericValue ?? 0,
       stateCode: logData.stateCode,
+      unitUsed: logData.unitUsed,
       notes: logData.notes,
       timestamp: Date.now()
     };
 
-    if (existingLogIndex >= 0) {
-      logToSave.id = logs[existingLogIndex].id;
+    let existingId = existingLogIndex >= 0 ? logs[existingLogIndex].id : undefined;
+    if (!existingId) {
+      const dbRecord = await db.logs.where({ habitId, date: targetDate }).first();
+      if (dbRecord) existingId = dbRecord.id;
+    }
+
+    if (existingId) {
+      logToSave.id = existingId;
     }
 
     // Save to Dexie
@@ -138,7 +145,12 @@ export const App: React.FC = () => {
       if (existingLogIndex >= 0) {
         updated[existingLogIndex] = logToSave;
       } else {
-        updated.push(logToSave);
+        const foundAgain = updated.findIndex(l => l.habitId === habitId && l.date === targetDate);
+        if (foundAgain >= 0) {
+          updated[foundAgain] = logToSave;
+        } else {
+          updated.push(logToSave);
+        }
       }
       return updated;
     });
@@ -367,6 +379,7 @@ export const App: React.FC = () => {
             logs={logs.filter(l => l.date.startsWith(currentMonth))}
             currentMonth={currentMonth}
             onCellClick={handleCellClick}
+            onUpdateLog={handleUpdateLog}
             monthlyRemarks={monthlyRemarks}
             onRemarksChange={handleRemarksChange}
             onAddCustomHabit={() => setIsCustomizerOpen(true)}

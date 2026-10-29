@@ -1,8 +1,25 @@
 import React, { useMemo, useState } from 'react';
+import confetti from 'canvas-confetti';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { calculateMonthSummary } from '../utils/analytics';
 import { getHijriDate } from '../utils/hijri';
-import { PlusCircle, HelpCircle, Trash2, X, AlertTriangle, Sparkles, HeartPulse, Activity } from 'lucide-react';
+import { 
+  PlusCircle, 
+  HelpCircle, 
+  Trash2, 
+  X, 
+  AlertTriangle, 
+  Sparkles, 
+  HeartPulse, 
+  Activity,
+  Minus,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  ExternalLink,
+  ShieldCheck
+} from 'lucide-react';
 import { analyzeMenstrualCycle } from '../utils/cycleEngine';
 
 interface MatrixGridProps {
@@ -12,6 +29,7 @@ interface MatrixGridProps {
   logs: HabitLog[];
   currentMonth: string; // YYYY-MM
   onCellClick: (habit: Habit, date: string, dayNumber: number) => void;
+  onUpdateLog?: (habitId: string, logData: Partial<HabitLog>) => void;
   monthlyRemarks: string;
   onRemarksChange: (val: string) => void;
   onAddCustomHabit: (sectionId: string) => void;
@@ -27,6 +45,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
   logs,
   currentMonth,
   onCellClick,
+  onUpdateLog,
   monthlyRemarks,
   onRemarksChange,
   onAddCustomHabit,
@@ -44,6 +63,41 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
 
   const [taskToDelete, setTaskToDelete] = useState<Habit | null>(null);
   const [cycleLength, setCycleLength] = useState<number>(28);
+  const [selectedCell, setSelectedCell] = useState<{
+    habit: Habit;
+    day: number;
+    date: string;
+  } | null>(null);
+
+  const triggerCelebration = () => {
+    try {
+      confetti({
+        particleCount: 40,
+        spread: 60,
+        origin: { y: 0.85 }
+      });
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleQuickUpdate = (logData: Partial<HabitLog>) => {
+    if (!selectedCell || !onUpdateLog) return;
+    onUpdateLog(selectedCell.habit.id, {
+      ...logData,
+      date: selectedCell.date
+    });
+  };
+
+  const handleSelectDay = (targetDay: number) => {
+    if (!selectedCell || targetDay < 1 || targetDay > daysInMonth) return;
+    const nextDate = `${currentMonth}-${String(targetDay).padStart(2, '0')}`;
+    setSelectedCell({
+      habit: selectedCell.habit,
+      day: targetDay,
+      date: nextDate
+    });
+  };
 
   // Compute target date for cycle analysis (defaults to today's date or mid-month)
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -84,6 +138,9 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
     }
     return map;
   }, [logs]);
+
+  // Derived active log for currently selected cell
+  const activeLog = selectedCell ? logMap.get(`${selectedCell.habit.id}:${selectedCell.date}`) : undefined;
 
   // Group habits by section
   const sectionHabitsMap = useMemo(() => {
@@ -231,7 +288,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${selectedCell ? 'pb-44 sm:pb-48' : 'pb-12'}`}>
       {/* Blank / Custom Template Welcoming Banner */}
       {isBlankTemplate && (
         <div className="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-sky-950/60 border border-emerald-800/60 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl">
@@ -568,16 +625,77 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                           {daysArray.map(d => {
                             const dateStr = `${currentMonth}-${String(d).padStart(2, '0')}`;
                             const isFriday = fridayDays.includes(d);
+                            const isSelected = selectedCell?.habit.id === habit.id && selectedCell?.day === d;
+                            const cellLog = logMap.get(`${habit.id}:${dateStr}`);
 
                             return (
                               <td
                                 key={d}
-                                onClick={() => onCellClick(habit, dateStr, d)}
-                                className={`text-center p-0.5 border-r border-slate-800/50 cursor-pointer select-none transition-colors ${
-                                  isFriday 
-                                    ? 'bg-emerald-950/20 hover:bg-emerald-900/40' 
-                                    : 'hover:bg-slate-800/70'
+                                onClick={() => {
+                                  if (onUpdateLog) {
+                                    if (habit.inputType === 'BOOLEAN') {
+                                      const newStatus = cellLog?.status === 'COMPLETED' ? 'FAILED' : 'COMPLETED';
+                                      onUpdateLog(habit.id, {
+                                        status: newStatus,
+                                        numericValue: newStatus === 'COMPLETED' ? 1 : 0,
+                                        date: dateStr
+                                      });
+                                      if (newStatus === 'COMPLETED') triggerCelebration();
+                                      setSelectedCell({ habit, day: d, date: dateStr });
+                                      return;
+                                    }
+
+                                    // If already selected, clicking again acts as quick increment
+                                    if (isSelected) {
+                                      if (habit.inputType === 'QUANTITY') {
+                                        const current = cellLog?.numericValue || 0;
+                                        const next = current + (habit.step || 1);
+                                        onUpdateLog(habit.id, {
+                                          status: next >= (habit.targetValue || 1) ? 'COMPLETED' : 'PARTIAL',
+                                          numericValue: next,
+                                          date: dateStr
+                                        });
+                                        if (next >= (habit.targetValue || 1)) triggerCelebration();
+                                        return;
+                                      } else if (habit.inputType === 'LATAIF') {
+                                        const current = cellLog?.numericValue || 0;
+                                        const next = current + 500;
+                                        onUpdateLog(habit.id, {
+                                          status: next >= 5000 ? 'COMPLETED' : 'PARTIAL',
+                                          numericValue: next,
+                                          unitUsed: cellLog?.unitUsed || 'count',
+                                          date: dateStr
+                                        });
+                                        if (next >= 5000) triggerCelebration();
+                                        return;
+                                      } else if (habit.inputType === 'DURATION') {
+                                        const current = cellLog?.numericValue || 0;
+                                        const next = current + 5;
+                                        onUpdateLog(habit.id, {
+                                          status: next >= (habit.targetValue || 20) ? 'COMPLETED' : 'PARTIAL',
+                                          numericValue: next,
+                                          date: dateStr
+                                        });
+                                        if (next >= (habit.targetValue || 20)) triggerCelebration();
+                                        return;
+                                      }
+                                    }
+
+                                    // Open quick count dock
+                                    setSelectedCell({ habit, day: d, date: dateStr });
+                                  } else {
+                                    onCellClick(habit, dateStr, d);
+                                  }
+                                }}
+                                onDoubleClick={() => onCellClick(habit, dateStr, d)}
+                                className={`text-center p-0.5 border-r border-slate-800/50 cursor-pointer select-none transition-all relative ${
+                                  isSelected 
+                                    ? 'ring-2 ring-emerald-400 bg-emerald-950/90 z-20 font-bold scale-105 shadow-md shadow-emerald-950' 
+                                    : isFriday 
+                                      ? 'bg-emerald-950/20 hover:bg-emerald-900/40' 
+                                      : 'hover:bg-slate-800/70'
                                 }`}
+                                title={`Day ${d}: Click to edit count (Double-click for full details)`}
                               >
                                 <div className="w-full h-7 flex items-center justify-center">
                                   {renderCellContent(habit, d)}
@@ -1195,6 +1313,640 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
           />
         </div>
       </div>
+
+      {/* Floating Matrix Quick-Count Dock */}
+      {selectedCell && (
+        <div className="fixed bottom-[max(env(safe-area-inset-bottom),16px)] left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-slate-900/95 backdrop-blur-xl border border-emerald-500/50 rounded-2xl p-3 sm:p-4 shadow-2xl ring-1 ring-white/10 text-slate-100 animate-fade-in">
+          {/* Dock Top Bar */}
+          <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <div className="flex items-center gap-1.5 truncate">
+                <span className="font-bold text-white text-sm truncate">
+                  {selectedCell.habit.title}
+                </span>
+                {isSpiritualTemplate && selectedCell.habit.urduTitle && (
+                  <span className="text-emerald-400 text-xs font-arabic" dir="rtl">
+                    {selectedCell.habit.urduTitle}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[11px] font-mono text-emerald-400 border border-slate-700 whitespace-nowrap">
+                  Day {selectedCell.day} • {selectedCell.date}
+                </span>
+                {showHijri && (
+                  <span className="text-[10px] text-amber-300 font-arabic whitespace-nowrap">
+                    {getHijriDate(selectedCell.date, hijriOffset).formatted}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => onCellClick(selectedCell.habit, selectedCell.date, selectedCell.day)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition"
+                title="Open full modal for notes and stopwatch"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Details & Notes</span>
+              </button>
+              <button
+                onClick={() => setSelectedCell(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick-Edit Body based on habit type */}
+          {/* 1. QUANTITY (Quran Pages, Zikr, Pushups, etc.) */}
+          {selectedCell.habit.inputType === 'QUANTITY' && (
+            <div className="mt-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              {/* Stepper + Direct numeric input */}
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-center">
+                <button
+                  onClick={() => {
+                    const current = activeLog?.numericValue || 0;
+                    const next = Math.max(0, current - (selectedCell.habit.step || 1));
+                    handleQuickUpdate({
+                      status: next >= (selectedCell.habit.targetValue || 1) ? 'COMPLETED' : (next > 0 ? 'PARTIAL' : 'FAILED'),
+                      numericValue: next
+                    });
+                  }}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition active:scale-95"
+                  title="Decrease"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-900 border border-slate-700 rounded-xl">
+                  <input
+                    type="number"
+                    min="0"
+                    value={activeLog?.numericValue ?? 0}
+                    onChange={(e) => {
+                      const next = Math.max(0, parseFloat(e.target.value) || 0);
+                      handleQuickUpdate({
+                        status: next >= (selectedCell.habit.targetValue || 1) ? 'COMPLETED' : (next > 0 ? 'PARTIAL' : 'FAILED'),
+                        numericValue: next
+                      });
+                      if (next >= (selectedCell.habit.targetValue || 1)) triggerCelebration();
+                    }}
+                    className="w-16 bg-transparent text-center font-mono font-bold text-lg text-emerald-400 focus:outline-none"
+                  />
+                  <span className="text-xs text-slate-400 font-medium">
+                    {selectedCell.habit.unit || 'units'}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => {
+                    const current = activeLog?.numericValue || 0;
+                    const next = current + (selectedCell.habit.step || 1);
+                    handleQuickUpdate({
+                      status: next >= (selectedCell.habit.targetValue || 1) ? 'COMPLETED' : 'PARTIAL',
+                      numericValue: next
+                    });
+                    if (next >= (selectedCell.habit.targetValue || 1)) triggerCelebration();
+                  }}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition active:scale-95"
+                  title="Increase"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                {((selectedCell.habit.step && selectedCell.habit.step >= 100) || (selectedCell.habit.targetValue && selectedCell.habit.targetValue >= 100)) ? (
+                  <>
+                    {[100, 500, 1000].map(addVal => (
+                      <button
+                        key={addVal}
+                        onClick={() => {
+                          const current = activeLog?.numericValue || 0;
+                          const next = current + addVal;
+                          handleQuickUpdate({
+                            status: next >= (selectedCell.habit.targetValue || 1) ? 'COMPLETED' : 'PARTIAL',
+                            numericValue: next
+                          });
+                          triggerCelebration();
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 font-bold text-xs transition active:scale-95"
+                      >
+                        +{addVal}
+                      </button>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    {[1, 5, 10].map(addVal => (
+                      <button
+                        key={addVal}
+                        onClick={() => {
+                          const current = activeLog?.numericValue || 0;
+                          const next = current + addVal;
+                          handleQuickUpdate({
+                            status: next >= (selectedCell.habit.targetValue || 1) ? 'COMPLETED' : 'PARTIAL',
+                            numericValue: next
+                          });
+                          if (next >= (selectedCell.habit.targetValue || 1)) triggerCelebration();
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 font-bold text-xs transition active:scale-95"
+                      >
+                        +{addVal}
+                      </button>
+                    ))}
+                  </>
+                )}
+
+                {selectedCell.habit.targetValue && (
+                  <button
+                    onClick={() => {
+                      const target = selectedCell.habit.targetValue || 1;
+                      handleQuickUpdate({
+                        status: 'COMPLETED',
+                        numericValue: target
+                      });
+                      triggerCelebration();
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1 active:scale-95"
+                  >
+                    <Check className="w-3 h-3" />
+                    <span>Target ({selectedCell.habit.targetValue})</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    handleQuickUpdate({
+                      status: 'FAILED',
+                      numericValue: 0
+                    });
+                  }}
+                  className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition"
+                >
+                  Clear (0)
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 2. LATAIF DUAL TRACKING (Count or Time: 5000 count = 30 min) */}
+          {selectedCell.habit.inputType === 'LATAIF' && (
+            <div className="mt-2.5 space-y-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              <div className="flex items-center justify-between">
+                {/* Mode Switcher */}
+                <div className="flex bg-slate-900 p-0.5 rounded-lg border border-slate-800 text-xs font-semibold">
+                  <button
+                    onClick={() => {
+                      const currentVal = activeLog?.numericValue || 0;
+                      const convertedVal = activeLog?.unitUsed === 'min' ? Math.round((currentVal * 5000) / 30) : currentVal;
+                      handleQuickUpdate({
+                        unitUsed: 'count',
+                        numericValue: convertedVal,
+                        status: convertedVal >= 5000 ? 'COMPLETED' : (convertedVal > 0 ? 'PARTIAL' : 'FAILED')
+                      });
+                    }}
+                    className={`px-3 py-1 rounded-md transition ${
+                      activeLog?.unitUsed !== 'min' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Count Mode
+                  </button>
+                  <button
+                    onClick={() => {
+                      const currentVal = activeLog?.numericValue || 0;
+                      const convertedVal = activeLog?.unitUsed !== 'min' ? Math.round((currentVal * 30) / 5000) : currentVal;
+                      handleQuickUpdate({
+                        unitUsed: 'min',
+                        numericValue: convertedVal,
+                        status: convertedVal >= 30 ? 'COMPLETED' : (convertedVal > 0 ? 'PARTIAL' : 'FAILED')
+                      });
+                    }}
+                    className={`px-3 py-1 rounded-md transition ${
+                      activeLog?.unitUsed === 'min' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Minutes Mode (30m)
+                  </button>
+                </div>
+
+                {/* Conversion Display */}
+                <div className="text-[11px] font-mono text-slate-400">
+                  {activeLog?.unitUsed === 'min' ? (
+                    <span className="text-sky-300">
+                      ≈ {Math.round(((activeLog?.numericValue || 0) * 5000) / 30).toLocaleString()} count
+                    </span>
+                  ) : (
+                    <span className="text-emerald-300">
+                      ≈ {Math.round(((activeLog?.numericValue || 0) * 30) / 5000)} min
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Controls */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+                {activeLog?.unitUsed === 'min' ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const current = activeLog?.numericValue || 0;
+                          const next = Math.max(0, current - 5);
+                          handleQuickUpdate({
+                            unitUsed: 'min',
+                            status: next >= 30 ? 'COMPLETED' : (next > 0 ? 'PARTIAL' : 'FAILED'),
+                            numericValue: next
+                          });
+                        }}
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="text-base font-bold text-sky-400 font-mono px-2">
+                        {activeLog?.numericValue || 0} min
+                      </span>
+                      <button
+                        onClick={() => {
+                          const current = activeLog?.numericValue || 0;
+                          const next = current + 5;
+                          handleQuickUpdate({
+                            unitUsed: 'min',
+                            status: next >= 30 ? 'COMPLETED' : 'PARTIAL',
+                            numericValue: next
+                          });
+                          if (next >= 30) triggerCelebration();
+                        }}
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {[5, 15].map(m => (
+                        <button
+                          key={m}
+                          onClick={() => {
+                            const next = (activeLog?.numericValue || 0) + m;
+                            handleQuickUpdate({
+                              unitUsed: 'min',
+                              status: next >= 30 ? 'COMPLETED' : 'PARTIAL',
+                              numericValue: next
+                            });
+                            if (next >= 30) triggerCelebration();
+                          }}
+                          className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold"
+                        >
+                          +{m}m
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => {
+                          handleQuickUpdate({ unitUsed: 'min', status: 'COMPLETED', numericValue: 30 });
+                          triggerCelebration();
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow"
+                      >
+                        30m Target ✓
+                      </button>
+                      <button
+                        onClick={() => handleQuickUpdate({ unitUsed: 'min', status: 'FAILED', numericValue: 0 })}
+                        className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs"
+                      >
+                        0
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const current = activeLog?.numericValue || 0;
+                          const next = Math.max(0, current - 500);
+                          handleQuickUpdate({
+                            unitUsed: 'count',
+                            status: next >= 5000 ? 'COMPLETED' : (next > 0 ? 'PARTIAL' : 'FAILED'),
+                            numericValue: next
+                          });
+                        }}
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="text-base font-bold text-emerald-400 font-mono px-2">
+                        {(activeLog?.numericValue || 0).toLocaleString()} count
+                      </span>
+                      <button
+                        onClick={() => {
+                          const current = activeLog?.numericValue || 0;
+                          const next = current + 500;
+                          handleQuickUpdate({
+                            unitUsed: 'count',
+                            status: next >= 5000 ? 'COMPLETED' : 'PARTIAL',
+                            numericValue: next
+                          });
+                          if (next >= 5000) triggerCelebration();
+                        }}
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {[500, 1000].map(cnt => (
+                        <button
+                          key={cnt}
+                          onClick={() => {
+                            const next = (activeLog?.numericValue || 0) + cnt;
+                            handleQuickUpdate({
+                              unitUsed: 'count',
+                              status: next >= 5000 ? 'COMPLETED' : 'PARTIAL',
+                              numericValue: next
+                            });
+                            if (next >= 5000) triggerCelebration();
+                          }}
+                          className="px-2 py-1 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 text-xs font-bold"
+                        >
+                          +{cnt}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => {
+                          handleQuickUpdate({ unitUsed: 'count', status: 'COMPLETED', numericValue: 5000 });
+                          triggerCelebration();
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow"
+                      >
+                        5,000 Target ✓
+                      </button>
+                      <button
+                        onClick={() => handleQuickUpdate({ unitUsed: 'count', status: 'FAILED', numericValue: 0 })}
+                        className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs"
+                      >
+                        0
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 3. DURATION (Minutes) */}
+          {selectedCell.habit.inputType === 'DURATION' && (
+            <div className="mt-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const current = activeLog?.numericValue || 0;
+                    const next = Math.max(0, current - 5);
+                    handleQuickUpdate({
+                      status: next >= (selectedCell.habit.targetValue || 20) ? 'COMPLETED' : (next > 0 ? 'PARTIAL' : 'FAILED'),
+                      numericValue: next
+                    });
+                  }}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <div className="flex items-center gap-1 px-3 py-1 bg-slate-900 border border-slate-700 rounded-xl">
+                  <input
+                    type="number"
+                    min="0"
+                    value={activeLog?.numericValue ?? 0}
+                    onChange={(e) => {
+                      const next = Math.max(0, parseFloat(e.target.value) || 0);
+                      handleQuickUpdate({
+                        status: next >= (selectedCell.habit.targetValue || 20) ? 'COMPLETED' : (next > 0 ? 'PARTIAL' : 'FAILED'),
+                        numericValue: next
+                      });
+                      if (next >= (selectedCell.habit.targetValue || 20)) triggerCelebration();
+                    }}
+                    className="w-14 bg-transparent text-center font-mono font-bold text-lg text-sky-400 focus:outline-none"
+                  />
+                  <span className="text-xs text-slate-400 font-medium">min</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const current = activeLog?.numericValue || 0;
+                    const next = current + 5;
+                    handleQuickUpdate({
+                      status: next >= (selectedCell.habit.targetValue || 20) ? 'COMPLETED' : 'PARTIAL',
+                      numericValue: next
+                    });
+                    if (next >= (selectedCell.habit.targetValue || 20)) triggerCelebration();
+                  }}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[5, 15, 30].map(mins => (
+                  <button
+                    key={mins}
+                    onClick={() => {
+                      const current = activeLog?.numericValue || 0;
+                      const next = current + mins;
+                      handleQuickUpdate({
+                        status: next >= (selectedCell.habit.targetValue || 20) ? 'COMPLETED' : 'PARTIAL',
+                        numericValue: next
+                      });
+                      if (next >= (selectedCell.habit.targetValue || 20)) triggerCelebration();
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-sky-950 hover:bg-sky-900 border border-sky-800 text-sky-300 font-bold text-xs transition"
+                  >
+                    +{mins}m
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    const target = selectedCell.habit.targetValue || 20;
+                    handleQuickUpdate({
+                      status: 'COMPLETED',
+                      numericValue: target
+                    });
+                    triggerCelebration();
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow"
+                >
+                  Target ({selectedCell.habit.targetValue || 20}m)
+                </button>
+                <button
+                  onClick={() => handleQuickUpdate({ status: 'FAILED', numericValue: 0 })}
+                  className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs"
+                >
+                  Clear (0)
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 4. NEGATIVE_ABSTINENCE (Inverse Tracking: 0 Incidents = Clean) */}
+          {selectedCell.habit.category === 'NEGATIVE_ABSTINENCE' && (
+            <div className="mt-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-300 font-semibold">
+                  Recorded Slips:
+                </span>
+                <span className={`font-mono font-bold text-base px-2.5 py-0.5 rounded-lg ${
+                  (activeLog?.numericValue || 0) === 0 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'
+                }`}>
+                  {activeLog?.numericValue || 0} {selectedCell.habit.unit || 'slips'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    handleQuickUpdate({
+                      status: 'COMPLETED',
+                      numericValue: 0
+                    });
+                    triggerCelebration();
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950 flex items-center gap-1.5 transition"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Mark Clean Day (0 Slips)</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const current = activeLog?.numericValue || 0;
+                    const next = current + 1;
+                    handleQuickUpdate({
+                      status: 'FAILED',
+                      numericValue: next
+                    });
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-rose-900/80 hover:bg-rose-800 border border-rose-700 text-rose-200 font-bold text-xs transition flex items-center gap-1.5"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>+1 Slip</span>
+                </button>
+
+                {(activeLog?.numericValue || 0) > 0 && (
+                  <button
+                    onClick={() => {
+                      const current = activeLog?.numericValue || 0;
+                      const next = Math.max(0, current - 1);
+                      handleQuickUpdate({
+                        status: next === 0 ? 'COMPLETED' : 'FAILED',
+                        numericValue: next
+                      });
+                    }}
+                    className="px-2 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                    title="Decrease slip count"
+                  >
+                    -1
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 5. MULTI_STATE / SLOT (e.g. 5 Daily Prayers) */}
+          {(selectedCell.habit.inputType === 'MULTI_STATE' || selectedCell.habit.inputType === 'SLOT') && selectedCell.habit.multiStates && (
+            <div className="mt-2.5 flex items-center gap-2 overflow-x-auto pb-1 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              {selectedCell.habit.multiStates.map(state => {
+                const isSelected = activeLog?.stateCode === state.code;
+                return (
+                  <button
+                    key={state.code}
+                    onClick={() => {
+                      handleQuickUpdate({
+                        status: state.scoreWeight > 0 ? 'COMPLETED' : 'FAILED',
+                        stateCode: state.code,
+                        numericValue: state.scoreWeight
+                      });
+                      if (state.scoreWeight === 1.0) triggerCelebration();
+                    }}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                      isSelected
+                        ? `${state.bgClass} ring-2 ring-emerald-400 shadow-md scale-105`
+                        : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-sm">{state.symbol}</span>
+                    <span>{state.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 6. BOOLEAN (Simple Checkbox) */}
+          {selectedCell.habit.inputType === 'BOOLEAN' && (
+            <div className="mt-2.5 flex items-center justify-center gap-3 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              <button
+                onClick={() => {
+                  handleQuickUpdate({ status: 'COMPLETED', numericValue: 1 });
+                  triggerCelebration();
+                }}
+                className={`px-4 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 ${
+                  activeLog?.status === 'COMPLETED' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-emerald-950 hover:text-emerald-300'
+                }`}
+              >
+                <Check className="w-4 h-4" />
+                <span>Done</span>
+              </button>
+              <button
+                onClick={() => handleQuickUpdate({ status: 'FAILED', numericValue: 0 })}
+                className={`px-4 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 ${
+                  activeLog?.status === 'FAILED' ? 'bg-rose-600 text-white shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-rose-950 hover:text-rose-300'
+                }`}
+              >
+                <X className="w-4 h-4" />
+                <span>Missed</span>
+              </button>
+              <button
+                onClick={() => handleQuickUpdate({ status: 'SKIPPED', numericValue: 0 })}
+                className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition ${
+                  activeLog?.status === 'SKIPPED' ? 'bg-slate-700 text-white shadow' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Skip (Pause)
+              </button>
+            </div>
+          )}
+
+          {/* Dock Bottom Day Stepper Navigation */}
+          <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+            <button
+              onClick={() => handleSelectDay(selectedCell.day - 1)}
+              disabled={selectedCell.day <= 1}
+              className="flex items-center gap-1 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-slate-300 font-semibold transition"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Day {selectedCell.day - 1}</span>
+            </button>
+
+            <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
+              Click cells or use arrows to rapid-log across the 31 days
+            </span>
+
+            <button
+              onClick={() => handleSelectDay(selectedCell.day + 1)}
+              disabled={selectedCell.day >= daysInMonth}
+              className="flex items-center gap-1 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-slate-300 font-semibold transition"
+            >
+              <span>Day {selectedCell.day + 1}</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
