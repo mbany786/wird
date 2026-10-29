@@ -327,9 +327,9 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                           {state.symbol}
                         </span>
                         <div className="text-left">
-                          <div>{state.label}</div>
+                          <div>{state.label.split(' (')[0]}</div>
                           {state.urduLabel && (
-                            <div className="text-xs opacity-75 font-normal" dir="rtl">{state.urduLabel}</div>
+                            <div className="text-xs opacity-75 font-normal font-arabic" dir="rtl">{state.urduLabel}</div>
                           )}
                         </div>
                       </div>

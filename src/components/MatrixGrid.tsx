@@ -68,6 +68,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
     day: number;
     date: string;
   } | null>(null);
+  const [activeDay, setActiveDay] = useState<number>(1);
 
   const triggerCelebration = () => {
     try {
@@ -79,24 +80,6 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
     } catch {
       // ignore
     }
-  };
-
-  const handleQuickUpdate = (logData: Partial<HabitLog>) => {
-    if (!selectedCell || !onUpdateLog) return;
-    onUpdateLog(selectedCell.habit.id, {
-      ...logData,
-      date: selectedCell.date
-    });
-  };
-
-  const handleSelectDay = (targetDay: number) => {
-    if (!selectedCell || targetDay < 1 || targetDay > daysInMonth) return;
-    const nextDate = `${currentMonth}-${String(targetDay).padStart(2, '0')}`;
-    setSelectedCell({
-      habit: selectedCell.habit,
-      day: targetDay,
-      date: nextDate
-    });
   };
 
   // Compute target date for cycle analysis (defaults to today's date or mid-month)
@@ -117,6 +100,30 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
   const [year, month] = currentMonth.split('-').map(Number);
   const daysInMonth = useMemo(() => new Date(year, month, 0).getDate(), [year, month]);
   const daysArray = useMemo(() => Array.from({ length: daysInMonth }, (_, i) => i + 1), [daysInMonth]);
+
+  // Ensure activeDay stays within valid range for month
+  const safeActiveDay = Math.min(Math.max(1, activeDay), daysInMonth);
+  const activeDateStr = `${currentMonth}-${String(safeActiveDay).padStart(2, '0')}`;
+
+  const handleQuickUpdate = (logData: Partial<HabitLog>) => {
+    if (!selectedCell || !onUpdateLog) return;
+    onUpdateLog(selectedCell.habit.id, {
+      ...logData,
+      date: selectedCell.date
+    });
+  };
+
+  const handleSelectDay = (targetDay: number) => {
+    if (targetDay < 1 || targetDay > daysInMonth) return;
+    setActiveDay(targetDay);
+    if (!selectedCell) return;
+    const nextDate = `${currentMonth}-${String(targetDay).padStart(2, '0')}`;
+    setSelectedCell({
+      habit: selectedCell.habit,
+      day: targetDay,
+      date: nextDate
+    });
+  };
 
   // Determine which days are Fridays in this month
   const fridayDays = useMemo(() => {
@@ -141,6 +148,170 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
 
   // Derived active log for currently selected cell
   const activeLog = selectedCell ? logMap.get(`${selectedCell.habit.id}:${selectedCell.date}`) : undefined;
+
+  // Adjust monthly completed days count directly for BOOLEAN / SLOT habits
+  const handleAdjustBooleanCount = (habit: Habit, delta: 1 | -1) => {
+    if (!onUpdateLog) return;
+    const candidateDays = habit.cadence === 'FRIDAY_ONLY' ? fridayDays : daysArray;
+    if (delta === 1) {
+      const activeValid = habit.cadence !== 'FRIDAY_ONLY' || fridayDays.includes(safeActiveDay);
+      const activeEntry = logMap.get(`${habit.id}:${activeDateStr}`);
+      if (activeValid && activeEntry?.status !== 'COMPLETED') {
+        onUpdateLog(habit.id, { status: 'COMPLETED', numericValue: 1, date: activeDateStr });
+        setSelectedCell({ habit, day: safeActiveDay, date: activeDateStr });
+        triggerCelebration();
+        return;
+      }
+      for (const d of candidateDays) {
+        const dStr = `${currentMonth}-${String(d).padStart(2, '0')}`;
+        const l = logMap.get(`${habit.id}:${dStr}`);
+        if (l?.status !== 'COMPLETED') {
+          onUpdateLog(habit.id, { status: 'COMPLETED', numericValue: 1, date: dStr });
+          setActiveDay(d);
+          setSelectedCell({ habit, day: d, date: dStr });
+          triggerCelebration();
+          return;
+        }
+      }
+    } else {
+      const activeEntry = logMap.get(`${habit.id}:${activeDateStr}`);
+      if (activeEntry?.status === 'COMPLETED') {
+        onUpdateLog(habit.id, { status: 'FAILED', numericValue: 0, date: activeDateStr });
+        setSelectedCell({ habit, day: safeActiveDay, date: activeDateStr });
+        return;
+      }
+      for (let i = candidateDays.length - 1; i >= 0; i--) {
+        const d = candidateDays[i];
+        const dStr = `${currentMonth}-${String(d).padStart(2, '0')}`;
+        const l = logMap.get(`${habit.id}:${dStr}`);
+        if (l?.status === 'COMPLETED') {
+          onUpdateLog(habit.id, { status: 'FAILED', numericValue: 0, date: dStr });
+          setActiveDay(d);
+          setSelectedCell({ habit, day: d, date: dStr });
+          return;
+        }
+      }
+    }
+  };
+
+  // Adjust multi-state count or set state on activeDay
+  const handleAdjustMultiStateCount = (habit: Habit, stateCode: string, delta: 1 | -1) => {
+    if (!onUpdateLog || !habit.multiStates) return;
+    const stateObj = habit.multiStates.find(s => s.code === stateCode);
+    if (!stateObj) return;
+
+    if (delta === 1) {
+      // First look for an unlogged day in the month so adding +1 increases that state's count without overwriting another state
+      for (const d of daysArray) {
+        const dStr = `${currentMonth}-${String(d).padStart(2, '0')}`;
+        const l = logMap.get(`${habit.id}:${dStr}`);
+        if (!l || !l.stateCode || l.status === 'SKIPPED') {
+          onUpdateLog(habit.id, {
+            status: stateObj.scoreWeight > 0 ? 'COMPLETED' : 'FAILED',
+            stateCode: stateObj.code,
+            numericValue: stateObj.scoreWeight,
+            date: dStr
+          });
+          setActiveDay(d);
+          setSelectedCell({ habit, day: d, date: dStr });
+          if (stateObj.scoreWeight === 1.0) triggerCelebration();
+          return;
+        }
+      }
+      // If all days are logged, update activeDay if different, else first day with different state
+      const activeEntry = logMap.get(`${habit.id}:${activeDateStr}`);
+      if (activeEntry?.stateCode !== stateCode) {
+        onUpdateLog(habit.id, {
+          status: stateObj.scoreWeight > 0 ? 'COMPLETED' : 'FAILED',
+          stateCode: stateObj.code,
+          numericValue: stateObj.scoreWeight,
+          date: activeDateStr
+        });
+        setSelectedCell({ habit, day: safeActiveDay, date: activeDateStr });
+        if (stateObj.scoreWeight === 1.0) triggerCelebration();
+        return;
+      }
+      for (const d of daysArray) {
+        const dStr = `${currentMonth}-${String(d).padStart(2, '0')}`;
+        const l = logMap.get(`${habit.id}:${dStr}`);
+        if (l?.stateCode !== stateCode) {
+          onUpdateLog(habit.id, {
+            status: stateObj.scoreWeight > 0 ? 'COMPLETED' : 'FAILED',
+            stateCode: stateObj.code,
+            numericValue: stateObj.scoreWeight,
+            date: dStr
+          });
+          setActiveDay(d);
+          setSelectedCell({ habit, day: d, date: dStr });
+          if (stateObj.scoreWeight === 1.0) triggerCelebration();
+          return;
+        }
+      }
+    } else {
+      for (let i = daysArray.length - 1; i >= 0; i--) {
+        const d = daysArray[i];
+        const dStr = `${currentMonth}-${String(d).padStart(2, '0')}`;
+        const l = logMap.get(`${habit.id}:${dStr}`);
+        if (l?.stateCode === stateCode) {
+          onUpdateLog(habit.id, {
+            status: 'SKIPPED',
+            stateCode: undefined,
+            numericValue: 0,
+            date: dStr
+          });
+          setActiveDay(d);
+          setSelectedCell({ habit, day: d, date: dStr });
+          return;
+        }
+      }
+    }
+  };
+
+  // Inline stepper for numeric / quantity / duration / lataif / negative habits on activeDay
+  const handleInlineQuantityEdit = (habit: Habit, deltaSteps: number, explicitValue?: number) => {
+    if (!onUpdateLog) return;
+    const dStr = activeDateStr;
+    const currentEntry = logMap.get(`${habit.id}:${dStr}`);
+    const currentVal = currentEntry?.numericValue || 0;
+
+    setSelectedCell({ habit, day: safeActiveDay, date: dStr });
+
+    if (habit.category === 'NEGATIVE_ABSTINENCE') {
+      const next = explicitValue !== undefined ? Math.max(0, explicitValue) : Math.max(0, currentVal + deltaSteps);
+      onUpdateLog(habit.id, {
+        status: next === 0 ? 'COMPLETED' : 'FAILED',
+        numericValue: next,
+        date: dStr
+      });
+      if (next === 0) triggerCelebration();
+      return;
+    }
+
+    if (habit.inputType === 'LATAIF') {
+      const isMin = currentEntry?.unitUsed === 'min';
+      const stepSize = isMin ? 5 : 500;
+      const target = isMin ? 30 : 5000;
+      const next = explicitValue !== undefined ? Math.max(0, explicitValue) : Math.max(0, currentVal + deltaSteps * stepSize);
+      onUpdateLog(habit.id, {
+        status: next >= target ? 'COMPLETED' : (next > 0 ? 'PARTIAL' : 'FAILED'),
+        numericValue: next,
+        unitUsed: isMin ? 'min' : 'count',
+        date: dStr
+      });
+      if (next >= target && (deltaSteps > 0 || (explicitValue ?? 0) >= target)) triggerCelebration();
+      return;
+    }
+
+    const stepSize = habit.inputType === 'DURATION' ? (habit.step || 5) : (habit.step || 1);
+    const target = habit.targetValue || (habit.inputType === 'DURATION' ? 20 : 1);
+    const next = explicitValue !== undefined ? Math.max(0, explicitValue) : Math.max(0, currentVal + deltaSteps * stepSize);
+    onUpdateLog(habit.id, {
+      status: next >= target ? 'COMPLETED' : (next > 0 ? 'PARTIAL' : 'FAILED'),
+      numericValue: next,
+      date: dStr
+    });
+    if (next >= target && (deltaSteps > 0 || (explicitValue ?? 0) >= target)) triggerCelebration();
+  };
 
   // Group habits by section
   const sectionHabitsMap = useMemo(() => {
@@ -476,17 +647,52 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
 
       {/* Scrollable Matrix Table Container */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+        {/* Matrix Quick-Edit Active Day Bar */}
+        <div className="bg-slate-950/95 border-b border-slate-800 px-3 sm:px-4 py-2 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+              Active Edit Day:
+            </span>
+            <div className="flex items-center gap-1 bg-slate-900 border border-emerald-700/60 rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => handleSelectDay(safeActiveDay - 1)}
+                disabled={safeActiveDay <= 1}
+                className="p-1 rounded hover:bg-slate-800 disabled:opacity-40 text-slate-200 transition"
+                title="Previous Day"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <span className="px-2 text-xs font-mono font-bold text-emerald-300">
+                Day {safeActiveDay}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSelectDay(safeActiveDay + 1)}
+                disabled={safeActiveDay >= daysInMonth}
+                className="p-1 rounded hover:bg-slate-800 disabled:opacity-40 text-slate-200 transition"
+                title="Next Day"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+          <span className="text-[10px] text-slate-400">
+            Tap <strong className="text-emerald-400">− / +</strong> on any task or tap any day cell (1–{daysInMonth})
+          </span>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1100px]">
+          <table className="w-full text-left border-collapse min-w-[980px]">
             {/* Table Header: Day Numbers 1 to 31 + Optional Hijri */}
             <thead>
               <tr className="bg-slate-950/90 border-b border-slate-800 text-slate-300 text-xs">
-                {/* Pinned Habit Name Column */}
-                <th className="sticky left-0 z-20 bg-slate-950 px-3 sm:px-4 py-3 min-w-[200px] sm:min-w-[270px] border-r border-slate-800">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5">
-                    <span className="font-bold tracking-wide uppercase text-slate-400 text-xs">Tasks & Schedule</span>
+                {/* Pinned Habit Name & Inline Counter Column */}
+                <th className="sticky left-0 z-20 bg-slate-950 px-2.5 sm:px-4 py-2.5 w-[178px] min-w-[178px] max-w-[178px] sm:w-[250px] sm:min-w-[250px] sm:max-w-none border-r border-slate-800 shadow-[2px_0_8px_rgba(0,0,0,0.4)]">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                    <span className="font-bold tracking-wide uppercase text-slate-300 text-[11px]">Tasks & Counts</span>
                     {isSpiritualTemplate && template.urduTitle && (
-                      <span className="text-xs text-emerald-400 font-normal font-arabic normal-case tracking-normal" dir="rtl">({template.urduTitle})</span>
+                      <span className="text-[11px] text-emerald-400 font-normal font-arabic normal-case tracking-normal" dir="rtl">({template.urduTitle})</span>
                     )}
                   </div>
                 </th>
@@ -494,21 +700,25 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 {/* Days 1 to 31 */}
                 {daysArray.map(d => {
                   const isFriday = fridayDays.includes(d);
+                  const isActiveDayCol = d === safeActiveDay;
                   const dateStr = `${currentMonth}-${String(d).padStart(2, '0')}`;
                   const hijriInfo = (isSpiritualTemplate && showHijri) ? getHijriDate(dateStr, hijriOffset) : null;
 
                   return (
                     <th
                       key={d}
-                      className={`text-center py-2 px-1 w-8 min-w-[34px] font-semibold text-[11px] border-r border-slate-800/60 ${
-                        isFriday 
-                          ? 'bg-emerald-950/70 text-emerald-300 font-bold' 
-                          : 'text-slate-400'
+                      onClick={() => handleSelectDay(d)}
+                      className={`text-center py-2 px-1 w-8 min-w-[34px] font-semibold text-[11px] border-r border-slate-800/60 cursor-pointer select-none transition ${
+                        isActiveDayCol
+                          ? 'bg-emerald-900/60 text-emerald-200 ring-1 ring-inset ring-emerald-400 font-bold'
+                          : isFriday 
+                            ? 'bg-emerald-950/70 text-emerald-300 font-bold hover:bg-emerald-900/50' 
+                            : 'text-slate-400 hover:bg-slate-800/60'
                       }`}
                       title={
                         hijriInfo 
-                          ? `Day ${d} (${hijriInfo.formatted})` 
-                          : `Day ${d}`
+                          ? `Day ${d} (${hijriInfo.formatted}) — Tap to set active edit day` 
+                          : `Day ${d} — Tap to set active edit day`
                       }
                     >
                       <div className="text-[11px] font-bold">{d}</div>
@@ -526,8 +736,8 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                   );
                 })}
 
-                {/* Pinned Summary Header */}
-                <th className="sticky right-0 z-20 bg-slate-950 px-3 py-3 min-w-[170px] text-center font-bold tracking-wide uppercase text-slate-400 border-l border-slate-800">
+                {/* Summary Header (Sticky only on XL desktop so mobile shows Day 1..31 columns clearly) */}
+                <th className="xl:sticky xl:right-0 z-20 bg-slate-950 px-3 py-3 min-w-[155px] text-center font-bold tracking-wide uppercase text-slate-400 border-l border-slate-800">
                   Summary
                 </th>
               </tr>
@@ -540,27 +750,29 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 return (
                   <React.Fragment key={section.id}>
                     {/* Section Header Row */}
-                    <tr className="bg-slate-950/70 text-slate-200">
+                    <tr className="bg-slate-950/80 text-slate-200">
                       <td
                         colSpan={daysInMonth + 2}
-                        className="px-3 sm:px-4 py-2 bg-slate-950/80 border-y border-slate-800 flex items-center justify-between"
+                        className="p-0 bg-slate-950/90 border-y border-slate-800"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold tracking-wider uppercase text-[11px] text-emerald-400">{section.title}</span>
-                          {isSpiritualTemplate && section.urduTitle && (
-                            <span className="text-xs font-normal text-emerald-300/80 font-arabic normal-case tracking-normal" dir="rtl">
-                              • {section.urduTitle}
-                            </span>
-                          )}
-                        </div>
+                        <div className="sticky left-0 w-[calc(100vw-28px)] max-w-[520px] px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-bold tracking-wider uppercase text-[11px] text-emerald-400 truncate">{section.title}</span>
+                            {isSpiritualTemplate && section.urduTitle && (
+                              <span className="text-xs font-normal text-emerald-300/80 font-arabic normal-case tracking-normal shrink-0" dir="rtl">
+                                • {section.urduTitle}
+                              </span>
+                            )}
+                          </div>
 
-                        <button
-                          onClick={() => onAddCustomHabit(section.id)}
-                          className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-emerald-300 bg-slate-800/80 hover:bg-slate-800 px-2 py-0.5 rounded transition"
-                        >
-                          <PlusCircle className="w-3 h-3" />
-                          <span>Add Task</span>
-                        </button>
+                          <button
+                            onClick={() => onAddCustomHabit(section.id)}
+                            className="flex items-center gap-1 text-[10px] font-medium text-slate-300 hover:text-emerald-300 bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded border border-slate-700 transition shrink-0"
+                          >
+                            <PlusCircle className="w-3 h-3" />
+                            <span>Add Task</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
 
@@ -568,55 +780,178 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                     {sectionHabits.map(habit => {
                       const habitLogsForMonth = logs.filter(l => l.habitId === habit.id);
                       const summary = calculateMonthSummary(habit, habitLogsForMonth, daysInMonth);
+                      const activeDayLog = logMap.get(`${habit.id}:${activeDateStr}`);
+                      const isHabitSelected = selectedCell?.habit.id === habit.id;
 
                       return (
-                        <tr key={habit.id} className="group hover:bg-slate-800/40 transition-colors">
-                          {/* Habit Title Column (Sticky Left) with Easy Remove Button */}
-                          <td className="sticky left-0 z-10 bg-slate-900 px-4 py-2 border-r border-slate-800 font-medium text-slate-200">
-                            <div className="flex items-center justify-between gap-2">
-                              {/* Clicking Task Title triggers quick manage modal */}
-                              <div 
-                                onClick={() => setTaskToDelete(habit)}
-                                className="cursor-pointer hover:text-emerald-300 transition flex items-center gap-1.5 flex-1 select-none"
-                                title="Click to manage or remove this task"
-                              >
-                                <div>
-                                  <span className="text-slate-100 font-semibold group-hover:text-emerald-300 transition">
+                        <tr key={habit.id} className={`group transition-colors ${isHabitSelected ? 'bg-emerald-950/20' : 'hover:bg-slate-800/40'}`}>
+                          {/* Habit Title & Inline Count Editor Column (Sticky Left) */}
+                          <td className="sticky left-0 z-10 bg-slate-900 px-2.5 sm:px-3.5 py-2 w-[178px] min-w-[178px] max-w-[178px] sm:w-[250px] sm:min-w-[250px] sm:max-w-none border-r border-slate-800 font-medium text-slate-200 shadow-[2px_0_8px_rgba(0,0,0,0.35)]">
+                            <div className="flex flex-col gap-1.5">
+                              {/* Top Line: Habit Title + Delete Icon */}
+                              <div className="flex items-start justify-between gap-1">
+                                <div 
+                                  onClick={() => setSelectedCell({ habit, day: safeActiveDay, date: activeDateStr })}
+                                  className="cursor-pointer hover:text-emerald-300 transition flex-1 select-none min-w-0"
+                                  title="Tap to open quick count editor"
+                                >
+                                  <span className="text-slate-100 font-semibold group-hover:text-emerald-300 transition text-[11px] sm:text-xs leading-tight block truncate">
                                     {habit.title}
                                   </span>
                                   {isSpiritualTemplate && habit.urduTitle && (
-                                    <span className="text-[11px] text-emerald-400/90 font-normal ml-2 font-arabic" dir="rtl">
+                                    <span className="text-[11px] text-emerald-400/90 font-normal font-arabic block leading-snug" dir="rtl">
                                       {habit.urduTitle}
                                     </span>
                                   )}
                                 </div>
-                              </div>
 
-                              {/* Unit or Target Badge + Direct Trash Button */}
-                              <div className="flex items-center gap-1.5">
-                                {habit.unit && (
-                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono font-bold">
-                                    {habit.unit}
-                                  </span>
-                                )}
-                                {habit.cadence === 'FRIDAY_ONLY' && (
-                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 font-medium border border-emerald-800">
-                                    Fri
-                                  </span>
-                                )}
-
-                                {/* Easy Remove Button */}
+                                {/* Direct Trash Button */}
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setTaskToDelete(habit);
                                   }}
-                                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-950 text-slate-500 hover:text-rose-400 transition"
+                                  className="opacity-60 sm:opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-rose-950 text-slate-500 hover:text-rose-400 transition shrink-0"
                                   title={`Remove ${habit.title}`}
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <Trash2 className="w-3 h-3" />
                                 </button>
+                              </div>
+
+                              {/* Bottom Line: Interactive Inline Count Stepper */}
+                              <div className="flex items-center justify-between gap-1 pt-0.5">
+                                {/* A. NEGATIVE ABSTINENCE Inline Stepper */}
+                                {habit.category === 'NEGATIVE_ABSTINENCE' ? (
+                                  <div className="flex items-center gap-1 w-full justify-between">
+                                    <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-1 py-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleInlineQuantityEdit(habit, -1)}
+                                        className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 active:scale-95"
+                                        title="Decrease slips"
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </button>
+                                      <span className={`text-[10px] font-mono font-bold px-1 ${
+                                        (activeDayLog?.numericValue || 0) > 0 ? 'text-rose-400' : 'text-emerald-400'
+                                      }`}>
+                                        {activeDayLog?.numericValue || 0} {habit.unit || 'slips'}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleInlineQuantityEdit(habit, 1)}
+                                        className="w-5 h-5 flex items-center justify-center rounded bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/70 active:scale-95"
+                                        title="Record +1 slip"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                    <span className="text-[9px] font-mono text-slate-400">
+                                      Σ{summary.totalVolume}
+                                    </span>
+                                  </div>
+                                ) : habit.inputType === 'MULTI_STATE' && habit.multiStates ? (
+                                  /* B. MULTI_STATE Inline Interactive Pills (e.g. Prayers) */
+                                  <div className="flex items-center gap-1 flex-wrap w-full">
+                                    {habit.multiStates.map(st => {
+                                      const count = summary.multiStateCounts?.[st.code] ?? 0;
+                                      const isCurrentDayState = activeDayLog?.stateCode === st.code;
+                                      return (
+                                        <button
+                                          key={st.code}
+                                          type="button"
+                                          onClick={() => handleAdjustMultiStateCount(habit, st.code, 1)}
+                                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border transition active:scale-95 flex items-center gap-0.5 ${
+                                            isCurrentDayState
+                                              ? 'bg-emerald-950/90 border-emerald-400 ring-1 ring-emerald-400/50'
+                                              : 'bg-slate-950 border-slate-800 hover:bg-slate-800'
+                                          }`}
+                                          style={{ color: st.color }}
+                                          title={`Tap to log ${st.label} (Day ${safeActiveDay})`}
+                                        >
+                                          <span>{st.symbol}</span>
+                                          <span>{count}</span>
+                                        </button>
+                                      );
+                                    })}
+                                    {activeDayLog?.stateCode && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAdjustMultiStateCount(habit, activeDayLog.stateCode!, -1)}
+                                        className="w-4 h-4 flex items-center justify-center rounded bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 text-[10px]"
+                                        title={`Clear Day ${safeActiveDay}`}
+                                      >
+                                        −
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (habit.inputType === 'QUANTITY' || habit.inputType === 'DURATION' || habit.inputType === 'LATAIF') ? (
+                                  /* C. QUANTITY / DURATION / LATAIF Inline Count Editor */
+                                  <div className="flex items-center justify-between gap-1 w-full">
+                                    <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-1 py-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleInlineQuantityEdit(habit, -1)}
+                                        className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 active:scale-95"
+                                        title={`Decrease Day ${safeActiveDay} count`}
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={activeDayLog?.numericValue ?? 0}
+                                        onChange={(e) => {
+                                          const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                          handleInlineQuantityEdit(habit, 0, val);
+                                        }}
+                                        className="w-11 bg-transparent text-center font-mono font-bold text-[11px] text-emerald-400 focus:outline-none"
+                                        title={`Day ${safeActiveDay} count`}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleInlineQuantityEdit(habit, 1)}
+                                        className="w-5 h-5 flex items-center justify-center rounded bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/60 active:scale-95"
+                                        title={`Increase Day ${safeActiveDay} count`}
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                    <span className="text-[9px] font-mono text-slate-400 truncate" title="Monthly Total">
+                                      Σ{summary.totalVolume >= 1000 ? `${(summary.totalVolume / 1000).toFixed(1)}k` : summary.totalVolume}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  /* D. BOOLEAN / SLOT Inline Count Stepper (e.g. 15 / 31) */
+                                  <div className="flex items-center justify-between gap-1 w-full">
+                                    <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-1 py-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAdjustBooleanCount(habit, -1)}
+                                        className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 active:scale-95"
+                                        title="Decrease completed count"
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </button>
+                                      <span className="text-[11px] font-mono font-bold text-emerald-400 px-1">
+                                        {summary.totalLoggedDays}
+                                        <span className="text-slate-500 font-normal">/{habit.cadence === 'FRIDAY_ONLY' ? fridayDays.length : daysInMonth}</span>
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAdjustBooleanCount(habit, 1)}
+                                        className="w-5 h-5 flex items-center justify-center rounded bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/60 active:scale-95"
+                                        title="Increase completed count"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                    <span className="text-[9px] font-mono text-slate-400">
+                                      {summary.completionRate}%
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -626,12 +961,14 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                             const dateStr = `${currentMonth}-${String(d).padStart(2, '0')}`;
                             const isFriday = fridayDays.includes(d);
                             const isSelected = selectedCell?.habit.id === habit.id && selectedCell?.day === d;
+                            const isActiveDayCol = d === safeActiveDay;
                             const cellLog = logMap.get(`${habit.id}:${dateStr}`);
 
                             return (
                               <td
                                 key={d}
                                 onClick={() => {
+                                  setActiveDay(d);
                                   if (onUpdateLog) {
                                     if (habit.inputType === 'BOOLEAN') {
                                       const newStatus = cellLog?.status === 'COMPLETED' ? 'FAILED' : 'COMPLETED';
@@ -641,6 +978,20 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                         date: dateStr
                                       });
                                       if (newStatus === 'COMPLETED') triggerCelebration();
+                                      setSelectedCell({ habit, day: d, date: dateStr });
+                                      return;
+                                    }
+
+                                    if ((habit.inputType === 'MULTI_STATE' || habit.inputType === 'SLOT') && habit.multiStates && habit.multiStates.length > 0) {
+                                      const currentIdx = habit.multiStates.findIndex(s => s.code === cellLog?.stateCode);
+                                      const nextState = habit.multiStates[(currentIdx + 1) % habit.multiStates.length];
+                                      onUpdateLog(habit.id, {
+                                        status: nextState.scoreWeight > 0 ? 'COMPLETED' : 'FAILED',
+                                        stateCode: nextState.code,
+                                        numericValue: nextState.scoreWeight,
+                                        date: dateStr
+                                      });
+                                      if (nextState.scoreWeight === 1.0) triggerCelebration();
                                       setSelectedCell({ habit, day: d, date: dateStr });
                                       return;
                                     }
@@ -691,11 +1042,13 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                 className={`text-center p-0.5 border-r border-slate-800/50 cursor-pointer select-none transition-all relative ${
                                   isSelected 
                                     ? 'ring-2 ring-emerald-400 bg-emerald-950/90 z-20 font-bold scale-105 shadow-md shadow-emerald-950' 
-                                    : isFriday 
-                                      ? 'bg-emerald-950/20 hover:bg-emerald-900/40' 
-                                      : 'hover:bg-slate-800/70'
+                                    : isActiveDayCol
+                                      ? 'bg-emerald-950/25 hover:bg-emerald-900/40'
+                                      : isFriday 
+                                        ? 'bg-emerald-950/15 hover:bg-emerald-900/35' 
+                                        : 'hover:bg-slate-800/70'
                                 }`}
-                                title={`Day ${d}: Click to edit count (Double-click for full details)`}
+                                title={`Day ${d}: Tap to edit count`}
                               >
                                 <div className="w-full h-7 flex items-center justify-center">
                                   {renderCellContent(habit, d)}
@@ -704,11 +1057,22 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                             );
                           })}
 
-                          {/* Summary Column */}
-                          <td className="sticky right-0 z-10 bg-slate-900 px-3 py-1.5 border-l border-slate-800 text-center font-mono">
+                          {/* Summary Column (Interactive + Sticky only on XL screens) */}
+                          <td 
+                            onClick={() => setSelectedCell({ habit, day: safeActiveDay, date: activeDateStr })}
+                            className="xl:sticky xl:right-0 z-10 bg-slate-900 px-2.5 py-1.5 border-l border-slate-800 text-center font-mono cursor-pointer hover:bg-slate-800/70 transition"
+                            title="Tap to edit counts"
+                          >
                             {/* 0. Negative Habits (Inverse Tracking: 0 incidents = 100% Clean) */}
                             {habit.category === 'NEGATIVE_ABSTINENCE' ? (
-                              <div className="text-[11px] font-bold">
+                              <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold">
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleInlineQuantityEdit(habit, -1); }}
+                                  className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200"
+                                >
+                                  −
+                                </button>
                                 {summary.totalVolume === 0 ? (
                                   <div>
                                     <span className="text-emerald-400 font-bold">100% Clean</span>
@@ -720,80 +1084,177 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                       {summary.totalVolume} {habit.unit || 'slips'}
                                     </span>
                                     <span className="text-[9px] text-slate-400 font-normal block">
-                                      {summary.completionRate}% clean days
+                                      {summary.completionRate}% clean
                                     </span>
                                   </div>
                                 )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleInlineQuantityEdit(habit, 1); }}
+                                  className="w-5 h-5 flex items-center justify-center rounded bg-rose-950 hover:bg-rose-900 text-rose-300"
+                                >
+                                  +
+                                </button>
                               </div>
                             ) : (
                               <>
                                 {/* 1. Multi-State Summary */}
                                 {habit.inputType === 'MULTI_STATE' && summary.multiStateCounts && (
-                                  <div className="flex items-center justify-center gap-1.5 text-[10px]">
+                                  <div className="flex items-center justify-center gap-1 text-[10px]">
                                     {habit.multiStates?.map(st => (
-                                      <span key={st.code} className="font-bold" style={{ color: st.color }} title={st.label}>
+                                      <button
+                                        key={st.code}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleAdjustMultiStateCount(habit, st.code, 1);
+                                        }}
+                                        className="px-1 py-0.5 rounded bg-slate-950 hover:bg-slate-800 border border-slate-800 font-bold"
+                                        style={{ color: st.color }}
+                                        title={`Tap to add ${st.label}`}
+                                      >
                                         {st.symbol}{summary.multiStateCounts?.[st.code] ?? 0}
-                                      </span>
+                                      </button>
                                     ))}
                                   </div>
                                 )}
 
                                 {/* 2. Quantity Volume Summary */}
                                 {habit.inputType === 'QUANTITY' && (
-                                  <div className="text-[11px] font-bold text-slate-200">
-                                    <span className="text-emerald-400">{summary.totalVolume.toLocaleString()}</span>
-                                    <span className="text-[10px] text-slate-400 font-normal ml-1">
-                                      {habit.unit}
-                                    </span>
-                                    <span className="text-[9px] text-slate-500 font-normal block">
-                                      avg: {summary.dailyAverage}/d
-                                    </span>
+                                  <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-slate-200">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleInlineQuantityEdit(habit, -1); }}
+                                      className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200"
+                                    >
+                                      −
+                                    </button>
+                                    <div>
+                                      <span className="text-emerald-400">{summary.totalVolume.toLocaleString()}</span>
+                                      <span className="text-[10px] text-slate-400 font-normal ml-1">
+                                        {habit.unit}
+                                      </span>
+                                      <span className="text-[9px] text-slate-500 font-normal block">
+                                        avg: {summary.dailyAverage}/d
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleInlineQuantityEdit(habit, 1); }}
+                                      className="w-5 h-5 flex items-center justify-center rounded bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200"
+                                    >
+                                      +
+                                    </button>
                                   </div>
                                 )}
 
                                 {/* 2b. Lataif Dual Summary */}
                                 {habit.inputType === 'LATAIF' && (
-                                  <div className="text-[11px] font-bold text-slate-200">
-                                    <span className="text-emerald-400">{summary.totalVolume.toLocaleString()}</span>
-                                    <span className="text-[10px] text-slate-400 font-normal ml-1">reps</span>
-                                    <span className="text-[9px] text-sky-400 font-normal block">
-                                      ≈ {Math.round(((summary.totalVolume * 30) / 5000 / 60) * 10) / 10} hrs
-                                    </span>
+                                  <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-slate-200">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleInlineQuantityEdit(habit, -1); }}
+                                      className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200"
+                                    >
+                                      −
+                                    </button>
+                                    <div>
+                                      <span className="text-emerald-400">{summary.totalVolume.toLocaleString()}</span>
+                                      <span className="text-[10px] text-slate-400 font-normal ml-1">reps</span>
+                                      <span className="text-[9px] text-sky-400 font-normal block">
+                                        ≈ {Math.round(((summary.totalVolume * 30) / 5000 / 60) * 10) / 10} hrs
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleInlineQuantityEdit(habit, 1); }}
+                                      className="w-5 h-5 flex items-center justify-center rounded bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200"
+                                    >
+                                      +
+                                    </button>
                                   </div>
                                 )}
 
                                 {/* 3. Duration Summary */}
                                 {habit.inputType === 'DURATION' && (
-                                  <div className="text-[11px] font-bold text-slate-200">
-                                    <span className="text-sky-400">{summary.totalVolume}</span>
-                                    <span className="text-[10px] text-slate-400 font-normal ml-1">min</span>
-                                    <span className="text-[9px] text-slate-500 font-normal block">
-                                      {Math.round((summary.totalVolume / 60) * 10) / 10} hrs
-                                    </span>
+                                  <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-slate-200">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleInlineQuantityEdit(habit, -1); }}
+                                      className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200"
+                                    >
+                                      −
+                                    </button>
+                                    <div>
+                                      <span className="text-sky-400">{summary.totalVolume}</span>
+                                      <span className="text-[10px] text-slate-400 font-normal ml-1">min</span>
+                                      <span className="text-[9px] text-slate-500 font-normal block">
+                                        {Math.round((summary.totalVolume / 60) * 10) / 10} hrs
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleInlineQuantityEdit(habit, 1); }}
+                                      className="w-5 h-5 flex items-center justify-center rounded bg-sky-900/80 hover:bg-sky-800 text-sky-200"
+                                    >
+                                      +
+                                    </button>
                                   </div>
                                 )}
 
                                 {/* 4. Boolean / Standard Check Summary */}
                                 {habit.inputType === 'BOOLEAN' && (
-                                  <div className="flex items-center justify-center gap-2 text-xs">
-                                    <span className="text-emerald-400 font-bold">
-                                      {summary.totalLoggedDays}
-                                    </span>
-                                    <span className="text-slate-500">/</span>
-                                    <span className="text-slate-400">
-                                      {habit.cadence === 'FRIDAY_ONLY' ? fridayDays.length : daysInMonth}
-                                    </span>
-                                    <span className="text-[10px] text-slate-500">
-                                      ({summary.completionRate}%)
-                                    </span>
+                                  <div className="flex items-center justify-center gap-1.5 text-xs">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleAdjustBooleanCount(habit, -1); }}
+                                      className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200"
+                                    >
+                                      −
+                                    </button>
+                                    <div>
+                                      <span className="text-emerald-400 font-bold">
+                                        {summary.totalLoggedDays}
+                                      </span>
+                                      <span className="text-slate-500">/</span>
+                                      <span className="text-slate-400">
+                                        {habit.cadence === 'FRIDAY_ONLY' ? fridayDays.length : daysInMonth}
+                                      </span>
+                                      <span className="text-[10px] text-slate-500 ml-1">
+                                        ({summary.completionRate}%)
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleAdjustBooleanCount(habit, 1); }}
+                                      className="w-5 h-5 flex items-center justify-center rounded bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200"
+                                    >
+                                      +
+                                    </button>
                                   </div>
                                 )}
 
                                 {/* 5. Slot Summary */}
                                 {habit.inputType === 'SLOT' && (
-                                  <div className="text-[10px] text-slate-300">
-                                    <span className="text-emerald-400 font-bold">{summary.totalLoggedDays}</span>
-                                    <span className="text-slate-500"> / {fridayDays.length} sessions</span>
+                                  <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-300">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleAdjustBooleanCount(habit, -1); }}
+                                      className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200"
+                                    >
+                                      −
+                                    </button>
+                                    <div>
+                                      <span className="text-emerald-400 font-bold">{summary.totalLoggedDays}</span>
+                                      <span className="text-slate-500"> / {fridayDays.length}</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleAdjustBooleanCount(habit, 1); }}
+                                      className="w-5 h-5 flex items-center justify-center rounded bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200"
+                                    >
+                                      +
+                                    </button>
                                   </div>
                                 )}
                               </>
@@ -1858,66 +2319,113 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
 
           {/* 5. MULTI_STATE / SLOT (e.g. 5 Daily Prayers) */}
           {(selectedCell.habit.inputType === 'MULTI_STATE' || selectedCell.habit.inputType === 'SLOT') && selectedCell.habit.multiStates && (
-            <div className="mt-2.5 flex items-center gap-2 overflow-x-auto pb-1 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
-              {selectedCell.habit.multiStates.map(state => {
-                const isSelected = activeLog?.stateCode === state.code;
-                return (
-                  <button
-                    key={state.code}
-                    onClick={() => {
-                      handleQuickUpdate({
-                        status: state.scoreWeight > 0 ? 'COMPLETED' : 'FAILED',
-                        stateCode: state.code,
-                        numericValue: state.scoreWeight
-                      });
-                      if (state.scoreWeight === 1.0) triggerCelebration();
-                    }}
-                    className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
-                      isSelected
-                        ? `${state.bgClass} ring-2 ring-emerald-400 shadow-md scale-105`
-                        : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
-                    }`}
-                  >
-                    <span className="text-sm">{state.symbol}</span>
-                    <span>{state.label}</span>
-                  </button>
-                );
-              })}
+            <div className="mt-2.5 bg-slate-950/80 p-2 rounded-xl border border-slate-800">
+              <div className="grid grid-cols-2 gap-1.5">
+                {selectedCell.habit.multiStates.map(state => {
+                  const isSelected = activeLog?.stateCode === state.code;
+                  const stateCount = logs.filter(l => l.habitId === selectedCell.habit.id && l.stateCode === state.code).length;
+                  const englishLabel = state.label.split(' (')[0];
+                  return (
+                    <div
+                      key={state.code}
+                      className={`px-2 py-1.5 rounded-xl border text-xs font-bold transition flex items-center justify-between gap-1 ${
+                        isSelected
+                          ? `${state.bgClass} ring-1 ring-emerald-400 shadow-md`
+                          : 'bg-slate-900 border-slate-800 text-slate-300'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleQuickUpdate({
+                            status: state.scoreWeight > 0 ? 'COMPLETED' : 'FAILED',
+                            stateCode: state.code,
+                            numericValue: state.scoreWeight
+                          });
+                          if (state.scoreWeight === 1.0) triggerCelebration();
+                        }}
+                        className="flex items-center gap-1 min-w-0 flex-1 text-left"
+                        title={`Set Day ${selectedCell.day} to ${englishLabel}`}
+                      >
+                        <span className="text-sm shrink-0" style={{ color: state.color }}>{state.symbol}</span>
+                        <span className="truncate text-[11px]">{englishLabel}</span>
+                      </button>
+
+                      <div className="flex items-center gap-1 shrink-0 bg-slate-950/90 border border-slate-800 rounded-lg px-1 py-0.5">
+                        <button
+                          type="button"
+                          onClick={() => handleAdjustMultiStateCount(selectedCell.habit, state.code, -1)}
+                          className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 active:scale-95"
+                          title={`Decrease ${englishLabel} count`}
+                        >
+                          −
+                        </button>
+                        <span className="px-1 font-mono text-[11px] text-emerald-300 min-w-[18px] text-center">
+                          {stateCount}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleAdjustMultiStateCount(selectedCell.habit, state.code, 1)}
+                          className="w-5 h-5 flex items-center justify-center rounded bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 active:scale-95"
+                          title={`Increase ${englishLabel} count`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          {/* 6. BOOLEAN (Simple Checkbox) */}
+          {/* 6. BOOLEAN (Simple Checkbox + Monthly Count Stepper) */}
           {selectedCell.habit.inputType === 'BOOLEAN' && (
-            <div className="mt-2.5 flex items-center justify-center gap-3 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
-              <button
-                onClick={() => {
-                  handleQuickUpdate({ status: 'COMPLETED', numericValue: 1 });
-                  triggerCelebration();
-                }}
-                className={`px-4 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 ${
-                  activeLog?.status === 'COMPLETED' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-emerald-950 hover:text-emerald-300'
-                }`}
-              >
-                <Check className="w-4 h-4" />
-                <span>Done</span>
-              </button>
-              <button
-                onClick={() => handleQuickUpdate({ status: 'FAILED', numericValue: 0 })}
-                className={`px-4 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 ${
-                  activeLog?.status === 'FAILED' ? 'bg-rose-600 text-white shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-rose-950 hover:text-rose-300'
-                }`}
-              >
-                <X className="w-4 h-4" />
-                <span>Missed</span>
-              </button>
-              <button
-                onClick={() => handleQuickUpdate({ status: 'SKIPPED', numericValue: 0 })}
-                className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition ${
-                  activeLog?.status === 'SKIPPED' ? 'bg-slate-700 text-white shadow' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Skip (Pause)
-              </button>
+            <div className="mt-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-medium">Month Count:</span>
+                <button
+                  type="button"
+                  onClick={() => handleAdjustBooleanCount(selectedCell.habit, -1)}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <span className="text-base font-mono font-bold text-emerald-400 px-2">
+                  {logs.filter(l => l.habitId === selectedCell.habit.id && l.status === 'COMPLETED').length} / {selectedCell.habit.cadence === 'FRIDAY_ONLY' ? fridayDays.length : daysInMonth}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleAdjustBooleanCount(selectedCell.habit, 1)}
+                  className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  onClick={() => {
+                    handleQuickUpdate({ status: 'COMPLETED', numericValue: 1 });
+                    triggerCelebration();
+                  }}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1 ${
+                    activeLog?.status === 'COMPLETED' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-emerald-950 hover:text-emerald-300'
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Day {selectedCell.day} Done</span>
+                </button>
+                <button
+                  onClick={() => handleQuickUpdate({ status: 'FAILED', numericValue: 0 })}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1 ${
+                    activeLog?.status === 'FAILED' ? 'bg-rose-600 text-white shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-rose-950 hover:text-rose-300'
+                  }`}
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Missed</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -1929,11 +2437,11 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
               className="flex items-center gap-1 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-slate-300 font-semibold transition"
             >
               <ChevronLeft className="w-4 h-4" />
-              <span>Day {selectedCell.day - 1}</span>
+              <span>{selectedCell.day > 1 ? `Day ${selectedCell.day - 1}` : 'Prev Day'}</span>
             </button>
 
             <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
-              Click cells or use arrows to rapid-log across the 31 days
+              Tap cells or use +/- to edit counts directly
             </span>
 
             <button
@@ -1941,7 +2449,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
               disabled={selectedCell.day >= daysInMonth}
               className="flex items-center gap-1 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-slate-300 font-semibold transition"
             >
-              <span>Day {selectedCell.day + 1}</span>
+              <span>{selectedCell.day < daysInMonth ? `Day ${selectedCell.day + 1}` : 'Next Day'}</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
