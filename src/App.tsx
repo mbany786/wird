@@ -358,7 +358,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 md:p-6 space-y-6 pb-[max(env(safe-area-inset-bottom),24px)]">
         {activeView === 'matrix' && (
           <MatrixGrid
             template={currentTemplate}

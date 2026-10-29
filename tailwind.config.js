@@ -7,6 +7,31 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        sans: [
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Plus Jakarta Sans"',
+          '"Geeza Pro"',
+          '"Damascus"',
+          '"Al Nile"',
+          '"Noto Naskh Arabic"',
+          '"Segoe UI"',
+          'Roboto',
+          'Helvetica',
+          'Arial',
+          'sans-serif'
+        ],
+        arabic: [
+          '"Geeza Pro"',
+          '"Damascus"',
+          '"Al Nile"',
+          '"Noto Naskh Arabic"',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'sans-serif'
+        ]
+      },
       colors: {
         brand: {
           50: '#f0fdf4',

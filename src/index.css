@@ -7,8 +7,20 @@
   color-scheme: light dark;
 }
 
-[dir="rtl"], .font-arabic, [lang="ur"], [lang="ar"] {
-  font-family: "Geeza Pro", "Damascus", "Al Nile", "Noto Naskh Arabic", -apple-system, BlinkMacSystemFont, sans-serif;
+/* Ensure Arabic, Urdu and RTL text is immune to uppercase transformation and letter-spacing breakage */
+:lang(ur), :lang(ar), [dir="rtl"], .font-arabic {
+  font-family: "Geeza Pro", "Damascus", "Al Nile", "Noto Naskh Arabic", -apple-system, BlinkMacSystemFont, sans-serif !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
+/* Safe area insets for iOS */
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top, 0px), 16px);
+}
+
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
 }
 
 body {

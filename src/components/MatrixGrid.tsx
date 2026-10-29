@@ -425,11 +425,11 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
             <thead>
               <tr className="bg-slate-950/90 border-b border-slate-800 text-slate-300 text-xs">
                 {/* Pinned Habit Name Column */}
-                <th className="sticky left-0 z-20 bg-slate-950 px-4 py-3 min-w-[270px] font-bold tracking-wide uppercase text-slate-400 border-r border-slate-800">
-                  <div className="flex items-center gap-1.5">
-                    <span>Tasks & Schedule</span>
+                <th className="sticky left-0 z-20 bg-slate-950 px-3 sm:px-4 py-3 min-w-[200px] sm:min-w-[270px] border-r border-slate-800">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5">
+                    <span className="font-bold tracking-wide uppercase text-slate-400 text-xs">Tasks & Schedule</span>
                     {isSpiritualTemplate && template.urduTitle && (
-                      <span className="text-xs text-emerald-400 font-normal font-arabic" dir="rtl">({template.urduTitle})</span>
+                      <span className="text-xs text-emerald-400 font-normal font-arabic normal-case tracking-normal" dir="rtl">({template.urduTitle})</span>
                     )}
                   </div>
                 </th>
@@ -486,12 +486,12 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                     <tr className="bg-slate-950/70 text-slate-200">
                       <td
                         colSpan={daysInMonth + 2}
-                        className="px-4 py-2 font-bold tracking-wider uppercase text-[11px] text-emerald-400 bg-slate-950/80 border-y border-slate-800 flex items-center justify-between"
+                        className="px-3 sm:px-4 py-2 bg-slate-950/80 border-y border-slate-800 flex items-center justify-between"
                       >
                         <div className="flex items-center gap-2">
-                          <span>{section.title}</span>
+                          <span className="font-bold tracking-wider uppercase text-[11px] text-emerald-400">{section.title}</span>
                           {isSpiritualTemplate && section.urduTitle && (
-                            <span className="text-xs font-normal text-emerald-300/80" dir="rtl">
+                            <span className="text-xs font-normal text-emerald-300/80 font-arabic normal-case tracking-normal" dir="rtl">
                               • {section.urduTitle}
                             </span>
                           )}
@@ -528,7 +528,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                     {habit.title}
                                   </span>
                                   {isSpiritualTemplate && habit.urduTitle && (
-                                    <span className="text-[11px] text-emerald-400/90 font-normal ml-2" dir="rtl">
+                                    <span className="text-[11px] text-emerald-400/90 font-normal ml-2 font-arabic" dir="rtl">
                                       {habit.urduTitle}
                                     </span>
                                   )}
@@ -763,8 +763,9 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
           {isSpiritualTemplate && (
             <div className="space-y-3 text-xs">
               <div className="space-y-1.5">
-                <p className="font-semibold text-slate-300 text-[11px] uppercase tracking-wide">
-                  For Obligatory Prayers (فرائض نمازوں کے لئے):
+                <p className="font-semibold text-slate-300 text-[11px] flex items-center gap-1.5">
+                  <span className="uppercase tracking-wide">For Obligatory Prayers</span>
+                  <span className="text-emerald-400 font-arabic font-normal" dir="rtl">(فرائض نمازوں کے لئے)</span>:
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
@@ -787,8 +788,9 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
               </div>
 
               <div className="space-y-1.5 pt-2 border-t border-slate-800">
-                <p className="font-semibold text-slate-300 text-[11px] uppercase tracking-wide">
-                  For Jore Participation (جوڑ میں شرکت):
+                <p className="font-semibold text-slate-300 text-[11px] flex items-center gap-1.5">
+                  <span className="uppercase tracking-wide">For Jore Participation</span>
+                  <span className="text-emerald-400 font-arabic font-normal" dir="rtl">(جوڑ میں شرکت)</span>:
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
@@ -816,8 +818,9 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
 
               {/* Negative Actions / Vices (Inverse Habit Mechanics) */}
               <div className="space-y-1.5 pt-2 border-t border-slate-800">
-                <p className="font-semibold text-slate-300 text-[11px] uppercase tracking-wide">
-                  Negative Actions & Vices (تزکیہ و ترکِ معاصی):
+                <p className="font-semibold text-slate-300 text-[11px] flex items-center gap-1.5">
+                  <span className="uppercase tracking-wide">Negative Actions & Vices</span>
+                  <span className="text-emerald-400 font-arabic font-normal" dir="rtl">(تزکیہ و ترکِ معاصی)</span>:
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
@@ -1168,8 +1171,11 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Monthly Remarks & Notes {isSpiritualTemplate && '(سالک کے احوال / تاثرات)'}
+              <h3 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <span className="uppercase tracking-wider">Monthly Remarks & Notes</span>
+                {isSpiritualTemplate && (
+                  <span className="text-emerald-400 font-normal font-arabic" dir="rtl">(سالک کے احوال / تاثرات)</span>
+                )}
               </h3>
               <p className="text-[11px] text-slate-400">
                 Review progress, monthly adjustments, and reading reflections for {currentMonth}.
@@ -1185,7 +1191,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
             onChange={(e) => onRemarksChange(e.target.value)}
             placeholder="Write your monthly reflections, insights, areas needing improvement..."
             rows={5}
-            className="w-full flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none font-sans"
+            className="w-full flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none font-sans font-arabic leading-relaxed"
           />
         </div>
       </div>

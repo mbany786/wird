@@ -215,7 +215,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                     {section.title}
                   </h3>
                   {isSpiritualTemplate && section.urduTitle && (
-                    <span className="text-xs text-emerald-300/80 font-normal" dir="rtl">
+                    <span className="text-xs text-emerald-300/80 font-normal font-arabic" dir="rtl">
                       • {section.urduTitle}
                     </span>
                   )}
@@ -252,7 +252,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                         <div className="flex-1">
                           <span className="text-sm font-bold text-slate-100">{habit.title}</span>
                           {isSpiritualTemplate && habit.urduTitle && (
-                            <span className="text-xs text-emerald-400/90 ml-2" dir="rtl">{habit.urduTitle}</span>
+                            <span className="text-xs text-emerald-400/90 ml-2 font-arabic" dir="rtl">{habit.urduTitle}</span>
                           )}
                         </div>
 
