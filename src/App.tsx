@@ -12,6 +12,7 @@ import { TemplatesSheet } from './components/TemplatesSheet';
 import { newId } from './utils/templateOps';
 import { DEFAULT_PRAYER_CONFIG, PrayerConfig } from './utils/prayerTimes';
 import { PrayerSettingsSheet } from './components/PrayerSettingsSheet';
+import { TasbihMode } from './components/TasbihMode';
 import { ReminderSettings } from './components/ReminderSettings';
 import { applyReminderPlan, buildReminderPlan, DEFAULT_REMINDERS, ReminderConfig } from './utils/reminders';
 import { ActivityFilter, ALL_ACTIVITIES, filterHabits } from './components/ActivityFilter';
@@ -35,6 +36,7 @@ export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'matrix' | 'daily' | 'bi' | 'customize'>('matrix');
   const [currentMonth, setCurrentMonth] = useState<string>(() => currentMonthStr());
   const [selectedDate, setSelectedDate] = useState<string>(() => todayStr());
+  const [tasbih, setTasbih] = useState<{ habitId?: string; date: string } | null>(null);
   const [monthlyRemarks, setMonthlyRemarks] = useState<string>('');
 
   // Hijri Calendar state (active by default for spiritual tracker)
@@ -487,6 +489,7 @@ export const App: React.FC = () => {
         onEmailReport={handleEmailReport}
         onManageTemplates={() => setIsTemplatesOpen(true)}
         onOpenPrayer={() => setIsPrayerOpen(true)}
+        onOpenTasbih={() => setTasbih({ date: todayStr() })}
         onOpenData={() => setIsDataOpen(true)}
       />
 
@@ -531,6 +534,7 @@ export const App: React.FC = () => {
             onAddCustomHabit={(sectionId) => setEditingHabit({ sectionId })}
             onRemoveHabit={handleDeleteHabit}
             onEditHabit={(h) => setEditingHabit({ habit: h })}
+            onOpenTasbih={(h, date) => setTasbih({ habitId: h.id, date })}
             showHijri={showHijri}
             hijriOffset={hijriOffset}
           />
@@ -550,6 +554,7 @@ export const App: React.FC = () => {
             hijriOffset={hijriOffset}
             prayerConfig={prayerConfig}
             onOpenPrayerSettings={() => setIsPrayerOpen(true)}
+            onOpenTasbih={(h) => setTasbih({ habitId: h.id, date: selectedDate })}
           />
         )}
 
@@ -607,6 +612,18 @@ export const App: React.FC = () => {
       )}
 
       <Toast toast={toast} onDismiss={dismissToast} />
+
+      {/* Tasbih: full-screen tap counter */}
+      {tasbih && (
+        <TasbihMode
+          habits={currentTemplate.habits}
+          logs={logs.filter(l => l.date === tasbih.date)}
+          date={tasbih.date}
+          initialHabitId={tasbih.habitId}
+          onSave={handleUpdateLog}
+          onClose={() => setTasbih(null)}
+        />
+      )}
 
       {/* Backup, restore, sample data */}
       {isDataOpen && <DataSheet onClose={() => setIsDataOpen(false)} onDataChanged={loadAll} />}

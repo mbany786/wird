@@ -15,7 +15,8 @@ import {
   ChevronDown,
   Ellipsis,
   DatabaseBackup,
-  Clock
+  Clock,
+  CircleDot
 } from 'lucide-react';
 
 export type AppView = 'matrix' | 'daily' | 'bi' | 'customize';
@@ -39,6 +40,7 @@ interface HeaderProps {
   onManageTemplates: () => void;
   onOpenData: () => void;
   onOpenPrayer: () => void;
+  onOpenTasbih?: () => void;
 }
 
 export const VIEW_TABS: { id: AppView; label: string; Icon: typeof LayoutGrid }[] = [
@@ -66,7 +68,8 @@ export const Header: React.FC<HeaderProps> = ({
   onEmailReport,
   onManageTemplates,
   onOpenData,
-  onOpenPrayer
+  onOpenPrayer,
+  onOpenTasbih
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const isSpiritualTemplate = currentTemplate.id === 'daily_spiritual_schedule';
@@ -218,6 +221,7 @@ export const Header: React.FC<HeaderProps> = ({
                       { label: 'Share as Excel', Icon: FileSpreadsheet, fn: onExportExcel },
                       { label: 'Share monthly chart (PDF)', Icon: Printer, fn: onPrintPDF },
                       { label: 'Email monthly report', Icon: Mail, fn: onEmailReport },
+                      ...(onOpenTasbih ? [{ label: 'Tasbih counter', Icon: CircleDot, fn: onOpenTasbih }] : []),
                       { label: 'Prayer times & reminders…', Icon: Clock, fn: onOpenPrayer },
                       { label: 'Backup & data…', Icon: DatabaseBackup, fn: onOpenData }
                     ].map(({ label, Icon, fn }) => (

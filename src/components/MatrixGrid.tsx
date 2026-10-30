@@ -1,3 +1,4 @@
+import { isTasbihHabit } from '../utils/tasbih';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { todayStr } from '../utils/date';
 import { shortExtraAmount, formatExtraAmount, allowsCustomAmount } from '../utils/amount';
@@ -22,7 +23,8 @@ import {
   Check,
   ExternalLink,
   ShieldCheck,
-  Pencil
+  Pencil,
+  CircleDot
 } from 'lucide-react';
 import { analyzeMenstrualCycle } from '../utils/cycleEngine';
 
@@ -39,6 +41,7 @@ interface MatrixGridProps {
   onAddCustomHabit: (sectionId: string) => void;
   onRemoveHabit?: (habitId: string) => void;
   onEditHabit?: (habit: Habit) => void;
+  onOpenTasbih?: (habit: Habit, date: string) => void;
   showHijri?: boolean;
   hijriOffset?: number;
 }
@@ -56,6 +59,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
   onAddCustomHabit,
   onRemoveHabit,
   onEditHabit,
+  onOpenTasbih,
   showHijri = false,
   hijriOffset = 0
 }) => {
@@ -1898,6 +1902,15 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
+              {onOpenTasbih && isTasbihHabit(selectedCell.habit) && (
+                <button
+                  onClick={() => onOpenTasbih(selectedCell.habit, selectedCell.date)}
+                  className="h-10 px-2.5 flex items-center justify-center gap-1 rounded-xl bg-emerald-950 border border-emerald-800 text-emerald-300 text-[13px] font-semibold transition"
+                  aria-label="Open tasbih counter"
+                >
+                  <CircleDot className="w-4 h-4" /> Tasbih
+                </button>
+              )}
               {onEditHabit && (
                 <button
                   onClick={() => onEditHabit(selectedCell.habit)}

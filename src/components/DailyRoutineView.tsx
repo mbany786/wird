@@ -1,3 +1,4 @@
+import { isTasbihHabit } from '../utils/tasbih';
 import React, { useState } from 'react';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { getHijriDate } from '../utils/hijri';
@@ -21,7 +22,8 @@ import {
   Trash2,
   ShieldCheck,
   AlertTriangle,
-  HeartPulse
+  HeartPulse,
+  CircleDot
 } from 'lucide-react';
 import { analyzeMenstrualCycle } from '../utils/cycleEngine';
 
@@ -38,6 +40,7 @@ interface DailyRoutineViewProps {
   hijriOffset?: number;
   prayerConfig?: PrayerConfig;
   onOpenPrayerSettings?: () => void;
+  onOpenTasbih?: (habit: Habit) => void;
 }
 
 export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
@@ -52,7 +55,8 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
   showHijri = false,
   hijriOffset = 0,
   prayerConfig,
-  onOpenPrayerSettings
+  onOpenPrayerSettings,
+  onOpenTasbih
 }) => {
   const isSpiritualTemplate = template.id === 'daily_spiritual_schedule';
   const isCycleTemplate = template.id === 'cycle_health_tracker';
@@ -278,10 +282,20 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                             <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 tabular-nums font-bold border border-emerald-800/60">
                               Inverse Track
                             </span>
-                          ) : habit.unit && (
+                          ) : habit.unit && !(onOpenTasbih && isTasbihHabit(habit)) && (
                             <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 tabular-nums font-semibold">
                               {habit.unit}
                             </span>
+                          )}
+                          {onOpenTasbih && isTasbihHabit(habit) && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenTasbih(habit)}
+                              aria-label={`Tasbih for ${habit.title}`}
+                              className="h-8 px-2.5 -my-1 rounded-lg bg-emerald-950 border border-emerald-800 text-emerald-300 text-[12px] font-semibold flex items-center gap-1"
+                            >
+                              <CircleDot className="w-3.5 h-3.5" /> Tasbih
+                            </button>
                           )}
                           {habit.cadence === 'WEEKLY_ONCE' && (
                             <span className="text-[11px] px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800/60 font-semibold">Weekly</span>

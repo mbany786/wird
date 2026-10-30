@@ -75,3 +75,5 @@ body {
     position: static !important;
   }
 }
+
+@keyframes tasbih-pop { from { transform: scale(1.06); } to { transform: scale(1); } }
