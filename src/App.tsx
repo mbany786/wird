@@ -14,6 +14,7 @@ import { DEFAULT_PRAYER_CONFIG, PrayerConfig } from './utils/prayerTimes';
 import { PrayerSettingsSheet } from './components/PrayerSettingsSheet';
 import { haptic } from './utils/haptics';
 import { describeLog } from './utils/describeLog';
+import { ResetSheet, ResetScope } from './components/ResetSheet';
 import { SettingsSheet } from './components/SettingsSheet';
 import { setWeekStart } from './utils/cadence';
 import { TasbihMode } from './components/TasbihMode';
@@ -48,6 +49,7 @@ export const App: React.FC = () => {
   const [hijriOffset, setHijriOffset] = useState<number>(0);
   const [weekStart, setWeekStartState] = useState<number>(1);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isResetOpen, setIsResetOpen] = useState(false);
   const [lastBackup, setLastBackup] = useState<string | null>(null);
   const openSettings = useCallback(async () => {
     setLastBackup(await db.getSetting<string | null>(SETTING.lastBackupAt, null));
@@ -228,6 +230,30 @@ export const App: React.FC = () => {
     }
     haptic.medium();
   }, []);
+
+  const handleReset = useCallback(async (scope: ResetScope, toDelete: HabitLog[]) => {
+    setIsResetOpen(false);
+    if (!toDelete.length) return;
+    const ids = toDelete.map(l => l.id!).filter(id => id != null);
+    await db.logs.bulkDelete(ids);
+    const gone = new Set(ids);
+    setLogs(prev => prev.filter(l => !(l.id != null && gone.has(l.id))));
+    undoRef.current = null;
+    haptic.warning();
+    const what = scope === 'day' ? 'this day' : scope === 'week' ? 'this week' : 'everything';
+    showToast({
+      text: `Cleared ${what} (${toDelete.length} ${toDelete.length === 1 ? 'entry' : 'entries'})`,
+      duration: 8000,
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          await db.logs.bulkPut(toDelete);
+          setLogs(prev => [...prev, ...toDelete]);
+          haptic.medium();
+        }
+      }
+    });
+  }, [showToast]);
 
   const handleUpdateLog = useCallback(async (habitId: string, logData: Partial<HabitLog>, opts?: { silent?: boolean }) => {
     const targetDate = logData.date || selectedDate;
@@ -542,6 +568,7 @@ export const App: React.FC = () => {
         onEmailReport={handleEmailReport}
         onManageTemplates={() => setIsTemplatesOpen(true)}
         onOpenSettings={openSettings}
+        onOpenReset={() => setIsResetOpen(true)}
         onOpenTasbih={() => setTasbih({ date: todayStr() })}
       />
 
@@ -607,6 +634,7 @@ export const App: React.FC = () => {
             prayerConfig={prayerConfig}
             onOpenPrayerSettings={() => setIsPrayerOpen(true)}
             onOpenTasbih={(h) => setTasbih({ habitId: h.id, date: selectedDate })}
+            onOpenReset={() => setIsResetOpen(true)}
           />
         )}
 
@@ -665,6 +693,18 @@ export const App: React.FC = () => {
       )}
 
       <Toast toast={toast} onDismiss={dismissToast} />
+
+      {/* Reset: clear a day, a week, or everything in this template */}
+      {isResetOpen && (
+        <ResetSheet
+          date={selectedDate}
+          templateName={currentTemplate.title}
+          habits={currentTemplate.habits}
+          logs={logs}
+          onReset={handleReset}
+          onClose={() => setIsResetOpen(false)}
+        />
+      )}
 
       {/* Settings: one place for every preference */}
       {isSettingsOpen && (

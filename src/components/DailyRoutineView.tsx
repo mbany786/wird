@@ -42,6 +42,7 @@ interface DailyRoutineViewProps {
   prayerConfig?: PrayerConfig;
   onOpenPrayerSettings?: () => void;
   onOpenTasbih?: (habit: Habit) => void;
+  onOpenReset?: () => void;
 }
 
 export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
@@ -57,7 +58,8 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
   hijriOffset = 0,
   prayerConfig,
   onOpenPrayerSettings,
-  onOpenTasbih
+  onOpenTasbih,
+  onOpenReset
 }) => {
   const isSpiritualTemplate = template.id === 'daily_spiritual_schedule';
   const isCycleTemplate = template.id === 'cycle_health_tracker';
@@ -140,6 +142,13 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
       </div>
       <div className="px-1">
         <TodaySummary habits={habits} sections={sections} logs={logs} date={selectedDate} isToday={isToday} />
+        {onOpenReset && (
+          <div className="flex justify-end mt-2">
+            <button type="button" onClick={onOpenReset} className="h-9 px-3 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 flex items-center gap-1.5">
+              <RotateCcw className="w-3.5 h-3.5" /> Reset
+            </button>
+          </div>
+        )}
       </div>
       </div>
 

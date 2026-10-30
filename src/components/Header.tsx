@@ -14,7 +14,8 @@ import {
   ChevronDown,
   Ellipsis,
   CircleDot,
-  Settings
+  Settings,
+  RotateCcw
 } from 'lucide-react';
 
 export type AppView = 'matrix' | 'daily' | 'bi' | 'customize';
@@ -35,6 +36,7 @@ interface HeaderProps {
   onEmailReport: () => void;
   onManageTemplates: () => void;
   onOpenSettings: () => void;
+  onOpenReset?: () => void;
   onOpenTasbih?: () => void;
 }
 
@@ -61,6 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
   onEmailReport,
   onManageTemplates,
   onOpenSettings,
+  onOpenReset,
   onOpenTasbih
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -172,6 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
                       { label: 'Share monthly chart (PDF)', Icon: Printer, fn: onPrintPDF },
                       { label: 'Email monthly report', Icon: Mail, fn: onEmailReport },
                       ...(onOpenTasbih ? [{ label: 'Tasbih counter', Icon: CircleDot, fn: onOpenTasbih }] : []),
+                      ...(onOpenReset ? [{ label: 'Reset entries…', Icon: RotateCcw, fn: onOpenReset }] : []),
                       { label: 'Settings…', Icon: Settings, fn: onOpenSettings }
                     ].map(({ label, Icon, fn }) => (
                       <button
