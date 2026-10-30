@@ -1,5 +1,5 @@
 import * as adhan from 'adhan';
-import { withApp, ok, summary, tab, openMenu } from './harness.mjs';
+import { withApp, ok, summary, tab, openMenu, openPrayerSettings } from './harness.mjs';
 
 const startFresh = async (p) => { const b = p.getByRole('button', { name: 'Start fresh' }); if (await b.count()) await b.click(); };
 const sheet = (p) => p.locator('[role="dialog"]').last();
@@ -20,7 +20,7 @@ function expected(lat, lng, method, hanafi, tz) {
 await withApp('Prayer times: city, method, Asr, logging, persistence', async ({ ctx, open }) => {
   const p = await open(ctx);
   await startFresh(p);
-  await tab(p, 'Daily').click(); await p.waitForTimeout(300);
+  await tab(p, 'Today').click(); await p.waitForTimeout(300);
   ok(await p.getByText("Set your location to see today's times").isVisible(), 'Daily invites prayer-time setup');
   await p.getByRole('button', { name: 'Set up' }).click(); await p.waitForTimeout(200);
   await sheet(p).getByLabel('Search city').fill('princ');
@@ -43,7 +43,7 @@ await withApp('Prayer times: city, method, Asr, logging, persistence', async ({ 
   ok(await p.getByRole('button', { name: /Fajr: With Jamat\. Change/ }).isVisible(), 'time card shows the logged state');
 
   await p.reload({ waitUntil: 'networkidle' }); await p.waitForTimeout(700);
-  await tab(p, 'Daily').click(); await p.waitForTimeout(300);
+  await tab(p, 'Today').click(); await p.waitForTimeout(300);
   ok(await p.getByTestId('time-asr').innerText() === asrHan, 'location, method and Asr setting persist');
 });
 
@@ -51,8 +51,7 @@ await withApp('Prayer times: use my location picks regional conventions', async 
   const ctx = await browser.newContext({ viewport: { width: 402, height: 874 }, geolocation: { latitude: 24.86, longitude: 67.01 }, permissions: ['geolocation'] });
   const p = await open(ctx);
   await startFresh(p);
-  await openMenu(p);
-  await p.getByRole('button', { name: 'Prayer times & reminders…' }).click(); await p.waitForTimeout(200);
+  await openPrayerSettings(p);
   await sheet(p).getByRole('button', { name: 'Use my location' }).click(); await p.waitForTimeout(1200);
   ok(await sheet(p).getByText('My location', { exact: true }).isVisible(), 'device location used');
   ok(await sheet(p).getByLabel('Method').inputValue() === 'Karachi', 'Karachi method suggested for Pakistan');
@@ -63,8 +62,7 @@ await withApp('Prayer times: denied location gives a clear way forward', async (
   const ctx = await browser.newContext({ viewport: { width: 402, height: 874 } }); // no geolocation permission
   const p = await open(ctx);
   await startFresh(p);
-  await openMenu(p);
-  await p.getByRole('button', { name: 'Prayer times & reminders…' }).click(); await p.waitForTimeout(200);
+  await openPrayerSettings(p);
   await sheet(p).getByRole('button', { name: 'Use my location' }).click(); await p.waitForTimeout(2500);
   ok(await sheet(p).getByRole('alert').isVisible(), `explains what to do (${(await sheet(p).getByRole('alert').innerText()).slice(0, 60)}…)`);
 });

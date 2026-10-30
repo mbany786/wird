@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { withApp, ok, summary, tab, matrixRows, openMenu, openData, closeSheet, logCount } from './harness.mjs';
+import { withApp, ok, summary, tab, matrixRows, openMenu, openData, openSettings, closeSheet, logCount } from './harness.mjs';
 
 await withApp('Fresh install: no demo data, first-run choice', async ({ ctx, open }) => {
   const page = await open(ctx);
@@ -35,26 +35,28 @@ await withApp('Settings remembered between launches', async ({ ctx, open }) => {
   await page.waitForTimeout(300);
   await sel.selectOption(vals[0][0]); // back to spiritual so Hijri controls show
   await page.waitForTimeout(300);
-  await openMenu(page);
+  await openSettings(page);
   await page.getByRole('button', { name: 'Hijri adjustment +1 day' }).click();
-  await page.getByRole('button', { name: /Hijri dates/ }).click(); // turn off
+  await page.getByRole('switch', { name: 'Hijri dates' }).click(); // turn off
+  await page.getByLabel('Week starts on').selectOption('0');
   await page.keyboard.press('Escape');
   await sel.selectOption(reading[0]);
   await page.waitForTimeout(300);
   await page.reload({ waitUntil: 'networkidle' }); await page.waitForTimeout(700);
   ok(await sel.inputValue() === reading[0], 'selected template restored after relaunch');
   await sel.selectOption(vals[0][0]); await page.waitForTimeout(300);
-  await openMenu(page);
+  await openSettings(page);
   ok(await page.getByRole('button', { name: 'Hijri adjustment +1 day' }).count() === 0, 'Hijri off restored (adjustment hidden)');
-  await page.getByRole('button', { name: /Hijri dates/ }).click(); // on again
+  ok(await page.getByLabel('Week starts on').inputValue() === '0', 'week start restored (Sunday)');
+  await page.getByRole('switch', { name: 'Hijri dates' }).click(); // on again
   await page.waitForTimeout(150);
-  ok(await page.getByRole('button', { name: 'Hijri adjustment +1 day' }).getAttribute('class').then(c => c.includes('bg-emerald-600')), 'Hijri +1 adjustment restored');
+  ok(await page.getByRole('button', { name: 'Hijri adjustment +1 day' }).getAttribute('aria-pressed') === 'true', 'Hijri +1 adjustment restored');
 });
 
 await withApp('Sample data: opt-in, never overwrites, removable', async ({ ctx, open }) => {
   const page = await open(ctx);
   // a real entry first: mark Fajr today as Jamat on Daily
-  await tab(page, 'Daily').click(); await page.waitForTimeout(300);
+  await tab(page, 'Today').click(); await page.waitForTimeout(300);
   const fajr = page.locator('div.rounded-xl.border').filter({ has: page.locator('span.text-sm.font-bold:text-is("Fajr")') }).first();
   await fajr.getByRole('button', { name: /Jamat/ }).click(); await page.waitForTimeout(300);
   ok(await logCount(page) === 1, 'one real entry logged');
@@ -63,7 +65,7 @@ await withApp('Sample data: opt-in, never overwrites, removable', async ({ ctx, 
   const withSample = await logCount(page);
   ok(withSample > 500, `sample data loaded (${withSample} entries)`);
   await closeSheet(page);
-  await tab(page, 'Daily').click(); await page.waitForTimeout(300);
+  await tab(page, 'Today').click(); await page.waitForTimeout(300);
   ok((await fajr.locator('button.ring-1').innerText()).includes('Jamat'), 'real Fajr entry kept (sample skipped that day)');
   await openData(page);
   await page.getByRole('button', { name: 'Remove sample data' }).click(); await page.waitForTimeout(800);

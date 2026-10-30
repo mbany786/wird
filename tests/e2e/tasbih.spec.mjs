@@ -14,7 +14,7 @@ const entry = (p, habitId) => p.evaluate((id) => new Promise((resolve) => {
 await withApp('Tasbih: count, rounds, undo, save, Lataif, free count', async ({ ctx, open }) => {
   const p = await open(ctx);
   await startFresh(p);
-  await tab(p, 'Daily').click(); await p.waitForTimeout(300);
+  await tab(p, 'Today').click(); await p.waitForTimeout(300);
   await p.getByRole('button', { name: 'Tasbih for Durood Sharif - 100' }).click(); await p.waitForTimeout(300);
   ok(await T(p).isVisible(), 'opens from the Daily card');
   ok(await T(p).getByLabel('Dhikr').inputValue() === 'durood_100', 'starts on the chosen dhikr');

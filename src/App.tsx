@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { db, SETTING } from './db';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from './types';
 import { TEMPLATES } from './data/templates';
@@ -12,6 +12,10 @@ import { TemplatesSheet } from './components/TemplatesSheet';
 import { newId } from './utils/templateOps';
 import { DEFAULT_PRAYER_CONFIG, PrayerConfig } from './utils/prayerTimes';
 import { PrayerSettingsSheet } from './components/PrayerSettingsSheet';
+import { haptic } from './utils/haptics';
+import { describeLog } from './utils/describeLog';
+import { SettingsSheet } from './components/SettingsSheet';
+import { setWeekStart } from './utils/cadence';
 import { TasbihMode } from './components/TasbihMode';
 import { ReminderSettings } from './components/ReminderSettings';
 import { applyReminderPlan, buildReminderPlan, DEFAULT_REMINDERS, ReminderConfig } from './utils/reminders';
@@ -20,7 +24,7 @@ import { downloadExcel, getEmailReportUri } from './utils/exportUtils';
 import { shareFile } from './utils/share';
 import { monthChartPdf } from './utils/monthChart';
 import { Toast, ToastMessage } from './components/Toast';
-import { todayStr, currentMonthStr } from './utils/date';
+import { todayStr, currentMonthStr, parseLocalDate } from './utils/date';
 import { DataSheet } from './components/DataSheet';
 import { HabitEditorSheet } from './components/HabitEditorSheet';
 import { SampleDataPrompt } from './components/SampleDataPrompt';
@@ -33,7 +37,7 @@ export const App: React.FC = () => {
   const [logs, setLogs] = useState<HabitLog[]>([]);
 
   // Navigation & View state
-  const [activeView, setActiveView] = useState<'matrix' | 'daily' | 'bi' | 'customize'>('matrix');
+  const [activeView, setActiveView] = useState<'matrix' | 'daily' | 'bi' | 'customize'>('daily');
   const [currentMonth, setCurrentMonth] = useState<string>(() => currentMonthStr());
   const [selectedDate, setSelectedDate] = useState<string>(() => todayStr());
   const [tasbih, setTasbih] = useState<{ habitId?: string; date: string } | null>(null);
@@ -42,6 +46,14 @@ export const App: React.FC = () => {
   // Hijri Calendar state (active by default for spiritual tracker)
   const [showHijri, setShowHijri] = useState<boolean>(true);
   const [hijriOffset, setHijriOffset] = useState<number>(0);
+  const [weekStart, setWeekStartState] = useState<number>(1);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [lastBackup, setLastBackup] = useState<string | null>(null);
+  const openSettings = useCallback(async () => {
+    setLastBackup(await db.getSetting<string | null>(SETTING.lastBackupAt, null));
+    setIsSettingsOpen(true);
+  }, []);
+  const changeWeekStart = (d: number) => { setWeekStart(d); setWeekStartState(d); };
 
   // Modals state
   const [cellModalData, setCellModalData] = useState<{
@@ -90,6 +102,9 @@ export const App: React.FC = () => {
     ]);
     setPrayerConfig({ ...DEFAULT_PRAYER_CONFIG, ...(await db.getSetting<PrayerConfig | null>(SETTING.prayerConfig, null)) });
     setReminderConfig({ ...DEFAULT_REMINDERS, ...(await db.getSetting<ReminderConfig | null>(SETTING.reminders, null)) });
+    const ws = await db.getSetting<number>(SETTING.weekStart, 1);
+    setWeekStart(ws);
+    setWeekStartState(ws);
 
     if (dbTemplates.length > 0) {
       // Keep built-in templates in their defined order, then the user's own
@@ -117,6 +132,7 @@ export const App: React.FC = () => {
   useEffect(() => { if (ready) db.setSetting(SETTING.currentTemplateId, currentTemplate.id); }, [ready, currentTemplate.id]);
   useEffect(() => { if (ready) db.setSetting(SETTING.showHijri, showHijri); }, [ready, showHijri]);
   useEffect(() => { if (ready) db.setSetting(SETTING.hijriOffset, hijriOffset); }, [ready, hijriOffset]);
+  useEffect(() => { if (ready) db.setSetting(SETTING.weekStart, weekStart); }, [ready, weekStart]);
   useEffect(() => { if (ready) db.setSetting(SETTING.prayerConfig, prayerConfig); }, [ready, prayerConfig]);
   useEffect(() => { if (ready) db.setSetting(SETTING.reminders, reminderConfig); }, [ready, reminderConfig]);
 
@@ -194,7 +210,26 @@ export const App: React.FC = () => {
   };
 
   // Upsert a habit log in state and Dexie
-  const handleUpdateLog = useCallback(async (habitId: string, logData: Partial<HabitLog>) => {
+  // Undo: remembers the entry as it was before the latest burst of changes to one habit/day
+  const undoRef = useRef<{ key: string; before?: HabitLog; at: number } | null>(null);
+
+  const restoreLog = useCallback(async (habitId: string, date: string, before?: HabitLog) => {
+    const current = await db.logs.where({ habitId, date }).first();
+    if (before) {
+      await db.logs.put(before);
+      setLogs(prev => {
+        const i = prev.findIndex(l => l.habitId === habitId && l.date === date);
+        if (i < 0) return [...prev, before];
+        const next = [...prev]; next[i] = before; return next;
+      });
+    } else {
+      if (current?.id) await db.logs.delete(current.id);
+      setLogs(prev => prev.filter(l => !(l.habitId === habitId && l.date === date)));
+    }
+    haptic.medium();
+  }, []);
+
+  const handleUpdateLog = useCallback(async (habitId: string, logData: Partial<HabitLog>, opts?: { silent?: boolean }) => {
     const targetDate = logData.date || selectedDate;
     const existingLogIndex = logs.findIndex(l => l.habitId === habitId && l.date === targetDate);
 
@@ -225,6 +260,26 @@ export const App: React.FC = () => {
     const id = await db.logs.put(logToSave);
     logToSave.id = id;
 
+    if (!opts?.silent) {
+      haptic.tap();
+      const key = `${habitId}|${targetDate}`;
+      const u = undoRef.current;
+      if (!u || u.key !== key || Date.now() - u.at > 6000) {
+        undoRef.current = { key, before: existing ? { ...existing } : undefined, at: Date.now() };
+      } else {
+        u.at = Date.now();
+      }
+      const snap = undoRef.current!;
+      const habit = currentTemplate.habits.find(h => h.id === habitId);
+      const today = todayStr();
+      const when = targetDate === today ? '' : ` · ${parseLocalDate(targetDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+      showToast({
+        text: describeLog(habit, logToSave) + when,
+        duration: 5000,
+        action: { label: 'Undo', onClick: () => { undoRef.current = null; restoreLog(habitId, targetDate, snap.before); } }
+      });
+    }
+
     // Update state
     setLogs(prev => {
       const updated = [...prev];
@@ -240,7 +295,7 @@ export const App: React.FC = () => {
       }
       return updated;
     });
-  }, [logs, selectedDate]);
+  }, [logs, selectedDate, currentTemplate.habits, showToast, restoreLog]);
 
   // Save monthly remarks
   const handleRemarksChange = async (val: string) => {
@@ -481,16 +536,13 @@ export const App: React.FC = () => {
         onViewChange={setActiveView}
         onOpenCustomizer={() => setIsCustomizerOpen(true)}
         showHijri={showHijri}
-        onToggleHijri={() => setShowHijri(prev => !prev)}
         hijriOffset={hijriOffset}
-        onOffsetChange={setHijriOffset}
         onExportExcel={handleExportExcel}
         onPrintPDF={handlePrintPDF}
         onEmailReport={handleEmailReport}
         onManageTemplates={() => setIsTemplatesOpen(true)}
-        onOpenPrayer={() => setIsPrayerOpen(true)}
+        onOpenSettings={openSettings}
         onOpenTasbih={() => setTasbih({ date: todayStr() })}
-        onOpenData={() => setIsDataOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -613,6 +665,27 @@ export const App: React.FC = () => {
 
       <Toast toast={toast} onDismiss={dismissToast} />
 
+      {/* Settings: one place for every preference */}
+      {isSettingsOpen && (
+        <SettingsSheet
+          showHijri={showHijri}
+          onToggleHijri={() => setShowHijri(v => !v)}
+          hijriOffset={hijriOffset}
+          onOffsetChange={setHijriOffset}
+          weekStart={weekStart}
+          onWeekStartChange={changeWeekStart}
+          prayerSummary={prayerConfig.location ? prayerConfig.location.name : 'Location not set'}
+          remindersOn={reminderConfig.enabled}
+          templateCount={templates.length}
+          lastBackup={lastBackup}
+          onOpenPrayer={() => setIsPrayerOpen(true)}
+          onOpenTemplates={() => setIsTemplatesOpen(true)}
+          onOpenData={() => setIsDataOpen(true)}
+          onOpenTasbih={() => { setIsSettingsOpen(false); setTasbih({ date: todayStr() }); }}
+          onClose={() => setIsSettingsOpen(false)}
+        />
+      )}
+
       {/* Tasbih: full-screen tap counter */}
       {tasbih && (
         <TasbihMode
@@ -620,13 +693,13 @@ export const App: React.FC = () => {
           logs={logs.filter(l => l.date === tasbih.date)}
           date={tasbih.date}
           initialHabitId={tasbih.habitId}
-          onSave={handleUpdateLog}
+          onSave={(id, d) => handleUpdateLog(id, d, { silent: true })}
           onClose={() => setTasbih(null)}
         />
       )}
 
       {/* Backup, restore, sample data */}
-      {isDataOpen && <DataSheet onClose={() => setIsDataOpen(false)} onDataChanged={loadAll} />}
+      {isDataOpen && <DataSheet onClose={() => { setIsDataOpen(false); db.getSetting<string | null>(SETTING.lastBackupAt, null).then(setLastBackup); }} onDataChanged={loadAll} />}
 
       {/* Prayer times (location, method) */}
       {isPrayerOpen && (

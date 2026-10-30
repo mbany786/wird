@@ -8,15 +8,13 @@ import {
   CheckSquare,
   BarChart3,
   SlidersHorizontal,
-  Moon,
   FileSpreadsheet,
   Printer,
   Mail,
   ChevronDown,
   Ellipsis,
-  DatabaseBackup,
-  Clock,
-  CircleDot
+  CircleDot,
+  Settings
 } from 'lucide-react';
 
 export type AppView = 'matrix' | 'daily' | 'bi' | 'customize';
@@ -31,21 +29,18 @@ interface HeaderProps {
   onViewChange: (view: AppView) => void;
   onOpenCustomizer: () => void;
   showHijri: boolean;
-  onToggleHijri: () => void;
   hijriOffset: number;
-  onOffsetChange: (offset: number) => void;
   onExportExcel: () => void;
   onPrintPDF: () => void;
   onEmailReport: () => void;
   onManageTemplates: () => void;
-  onOpenData: () => void;
-  onOpenPrayer: () => void;
+  onOpenSettings: () => void;
   onOpenTasbih?: () => void;
 }
 
 export const VIEW_TABS: { id: AppView; label: string; Icon: typeof LayoutGrid }[] = [
+  { id: 'daily', label: 'Today', Icon: CheckSquare },
   { id: 'matrix', label: 'Matrix', Icon: LayoutGrid },
-  { id: 'daily', label: 'Daily', Icon: CheckSquare },
   { id: 'bi', label: 'Analytics', Icon: BarChart3 }
 ];
 
@@ -60,15 +55,12 @@ export const Header: React.FC<HeaderProps> = ({
   onViewChange,
   onOpenCustomizer,
   showHijri,
-  onToggleHijri,
   hijriOffset,
-  onOffsetChange,
   onExportExcel,
   onPrintPDF,
   onEmailReport,
   onManageTemplates,
-  onOpenData,
-  onOpenPrayer,
+  onOpenSettings,
   onOpenTasbih
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -159,7 +151,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className={`relative z-50 w-10 h-10 flex items-center justify-center rounded-xl transition ${
                   menuOpen ? 'bg-slate-800 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
                 }`}
-                title="More: Hijri settings and export"
+                title="Share, Tasbih and Settings"
                 aria-label="More options"
                 aria-expanded={menuOpen}
               >
@@ -175,55 +167,12 @@ export const Header: React.FC<HeaderProps> = ({
                     onClick={() => setMenuOpen(false)}
                   />
                   <div className="absolute right-0 top-12 z-50 w-64 rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl p-1.5 text-[15px]">
-                    {isSpiritualTemplate && (
-                      <div className="px-2.5 py-2 border-b border-slate-800 mb-1">
-                        <button
-                          type="button"
-                          onClick={onToggleHijri}
-                          className="w-full flex items-center justify-between min-h-[40px]"
-                        >
-                          <span className="flex items-center gap-2.5 text-slate-200">
-                            <Moon className="w-4 h-4 text-emerald-400" />
-                            Hijri dates
-                          </span>
-                          <span
-                            className={`w-11 h-6 rounded-full p-0.5 transition ${showHijri ? 'bg-emerald-600' : 'bg-slate-700'}`}
-                            aria-hidden
-                          >
-                            <span className={`block w-5 h-5 rounded-full bg-white transition ${showHijri ? 'translate-x-5' : ''}`} />
-                          </span>
-                        </button>
-
-                        {showHijri && (
-                          <div className="flex items-center justify-between mt-1.5">
-                            <span className="text-[13px] text-slate-400">Moon-sighting adjustment</span>
-                            <div className="flex bg-slate-950 border border-slate-800 rounded-lg p-0.5">
-                              {[-1, 0, 1].map(offset => (
-                                <button
-                                  key={offset}
-                                  type="button"
-                                  onClick={() => onOffsetChange(offset)}
-                                  className={`w-9 h-8 rounded-md text-[13px] font-semibold tabular-nums transition ${
-                                    hijriOffset === offset ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:bg-slate-800'
-                                  }`}
-                                  aria-label={`Hijri adjustment ${offset > 0 ? '+' : ''}${offset} day`}
-                                >
-                                  {offset > 0 ? `+${offset}` : offset}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
                     {[
                       { label: 'Share as Excel', Icon: FileSpreadsheet, fn: onExportExcel },
                       { label: 'Share monthly chart (PDF)', Icon: Printer, fn: onPrintPDF },
                       { label: 'Email monthly report', Icon: Mail, fn: onEmailReport },
                       ...(onOpenTasbih ? [{ label: 'Tasbih counter', Icon: CircleDot, fn: onOpenTasbih }] : []),
-                      { label: 'Prayer times & reminders…', Icon: Clock, fn: onOpenPrayer },
-                      { label: 'Backup & data…', Icon: DatabaseBackup, fn: onOpenData }
+                      { label: 'Settings…', Icon: Settings, fn: onOpenSettings }
                     ].map(({ label, Icon, fn }) => (
                       <button
                         key={label}
@@ -250,7 +199,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="month"
               value={currentMonth}
               onChange={(e) => e.target.value && onMonthChange(e.target.value)}
-              className="bg-transparent text-slate-200 focus:outline-none cursor-pointer font-medium"
+              className="bg-transparent text-slate-200 focus:outline-none cursor-pointer font-medium [color-scheme:dark]"
               aria-label="Month"
             />
           </label>

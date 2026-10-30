@@ -45,19 +45,35 @@ export function summary() {
 
 // ---- helpers shared by specs ----
 export const tab = (page, name) => page.getByRole('button', { name, exact: true }).first();
-export const matrixRows = (page) => page.locator('td.sticky span.text-\\[15px\\]').allInnerTexts();
+export async function matrixRows(page) {
+  if (!(await page.locator('table').count())) { await tab(page, 'Matrix').click(); await page.waitForTimeout(300); }
+  return page.locator('td.sticky span.text-\\[15px\\]').allInnerTexts();
+}
 export async function openMenu(page) {
   await page.getByRole('button', { name: 'More options' }).click();
   await page.waitForTimeout(150);
 }
-export async function openData(page) {
+export async function openSettings(page) {
   await openMenu(page);
-  await page.getByRole('button', { name: 'Backup & data…' }).click();
+  await page.getByRole('button', { name: 'Settings…' }).click();
+  await page.waitForTimeout(250);
+}
+export async function openData(page) {
+  await openSettings(page);
+  await page.getByRole('button', { name: 'Backup & data' }).click();
   await page.waitForTimeout(300);
 }
+export async function openPrayerSettings(page) {
+  await openSettings(page);
+  await page.getByRole('button', { name: 'Prayer times & reminders' }).click();
+  await page.waitForTimeout(300);
+}
+/** Closes every open sheet (Settings can sit under the one opened from it). */
 export async function closeSheet(page) {
-  await page.locator('[role="dialog"] button[aria-label="Close"]').last().click();
-  await page.waitForTimeout(200);
+  for (let i = 0; i < 4 && await page.locator('[role="dialog"] button[aria-label="Close"]').count(); i++) {
+    await page.locator('[role="dialog"] button[aria-label="Close"]').last().click();
+    await page.waitForTimeout(200);
+  }
 }
 export async function logCount(page) {
   return page.evaluate(() => new Promise((resolve) => {

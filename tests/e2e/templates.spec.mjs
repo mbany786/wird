@@ -60,7 +60,7 @@ await withApp('Starter, duplicate (separate history), export/import, delete, res
   const p = await open(ctx);
   await startFresh(p);
   // log Fajr on the original
-  await tab(p, 'Daily').click(); await p.waitForTimeout(300);
+  await tab(p, 'Today').click(); await p.waitForTimeout(300);
   await p.locator('div.rounded-xl.border').filter({ has: p.locator('span.text-sm.font-bold:text-is("Fajr")') }).first().getByRole('button', { name: /Jamat/ }).click();
   await p.waitForTimeout(200);
 
@@ -75,7 +75,7 @@ await withApp('Starter, duplicate (separate history), export/import, delete, res
   await openTemplates(p);
   await sheet(p).getByRole('button', { name: 'Copy current' }).click(); await p.waitForTimeout(400);
   ok(await title(p) === 'Daily Spiritual Schedule (copy)', 'duplicate created');
-  await tab(p, 'Daily').click(); await p.waitForTimeout(300);
+  await tab(p, 'Today').click(); await p.waitForTimeout(300);
   const fajrCopy = p.locator('div.rounded-xl.border').filter({ has: p.locator('span.text-sm.font-bold:text-is("Fajr")') }).first();
   ok(await fajrCopy.locator('button.ring-1').count() === 0, 'duplicate starts with no history');
   await fajrCopy.getByRole('button', { name: /Qaza/ }).click(); await p.waitForTimeout(200);

@@ -15,9 +15,17 @@ interface SheetProps {
  * Full-height sheet on iPhone, centred dialog on iPad/desktop.
  * Escape closes it; the page behind doesn't scroll while it's open.
  */
+// Open sheets, newest last: Escape closes only the top one
+const openSheets: object[] = [];
+
 export const Sheet: React.FC<SheetProps> = ({ title, subtitle, onClose, children, footer, wide }) => {
+  const [token] = React.useState(() => ({}));
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    openSheets.push(token);
+    return () => { const i = openSheets.indexOf(token); if (i >= 0) openSheets.splice(i, 1); };
+  }, [token]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && openSheets[openSheets.length - 1] === token) onClose(); };
     window.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -25,7 +33,7 @@ export const Sheet: React.FC<SheetProps> = ({ title, subtitle, onClose, children
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [onClose]);
+  }, [onClose, token]);
 
   return (
     <div className="fixed inset-0 z-[55] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={title}>

@@ -1,3 +1,4 @@
+import { TodaySummary } from './TodaySummary';
 import { isTasbihHabit } from '../utils/tasbih';
 import React, { useState } from 'react';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
@@ -83,7 +84,8 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Date Navigation Bar */}
-      <div className="flex items-center justify-between gap-2 bg-slate-900 border border-slate-800 px-2 py-3 rounded-2xl shadow-xl">
+      <div className="bg-slate-900 border border-slate-800 px-2 py-3 rounded-2xl shadow-xl">
+      <div className="flex items-center justify-between gap-2">
         <button
           onClick={handlePrevDay}
           className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
@@ -135,6 +137,10 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
         >
           <ChevronRight className="w-5 h-5" />
         </button>
+      </div>
+      <div className="px-1">
+        <TodaySummary habits={habits} sections={sections} logs={logs} date={selectedDate} isToday={isToday} />
+      </div>
       </div>
 
       {/* Prayer times with one-tap logging */}
@@ -262,6 +268,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                   return (
                     <div 
                       key={habit.id}
+                      id={`habit-${habit.id}`}
                       className={`p-3.5 rounded-xl border transition-all ${
                         isNegative
                           ? (isClean ? 'bg-emerald-950/15 border-emerald-900/40' : 'bg-rose-950/20 border-rose-900/60')

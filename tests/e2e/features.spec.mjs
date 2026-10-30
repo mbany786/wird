@@ -10,7 +10,7 @@ await withApp('Exports go through share/download and produce real files', async 
   const page = await open(ctx);
   await startFresh(page);
   // log something so the files have content
-  await tab(page, 'Daily').click(); await page.waitForTimeout(300);
+  await tab(page, 'Today').click(); await page.waitForTimeout(300);
   await dailyCard(page, 'Fajr').getByRole('button', { name: /Takbeer/ }).click(); await page.waitForTimeout(200);
 
   await openMenu(page);
@@ -65,7 +65,7 @@ await withApp('Edit habits: rename, cadence, lock, reorder, from Studio and Matr
   // lock: log an entry for Ishraq, then the type is locked; edit from Matrix pencil
   await page.locator('td.sticky span.text-\\[15px\\]:text-is("Ishraq")').click(); await page.waitForTimeout(200);
   await page.getByRole('button', { name: 'Close', exact: true }).click();
-  await tab(page, 'Daily').click(); await page.waitForTimeout(300);
+  await tab(page, 'Today').click(); await page.waitForTimeout(300);
   await page.getByRole('button', { name: 'Mark Ishraq done' }).click(); await page.waitForTimeout(200);
   await tab(page, 'Matrix').click(); await page.waitForTimeout(300);
   await page.locator('td.sticky span.text-\\[15px\\]:text-is("Ishraq")').click(); await page.waitForTimeout(200);
@@ -83,12 +83,13 @@ await withApp('Weekly habits are scored per week', async ({ ctx, open }) => {
   await page.getByLabel('How often').selectOption('WEEKLY_ONCE');
   await page.getByRole('button', { name: 'Save', exact: true }).click(); await page.waitForTimeout(200);
   await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+  await tab(page, 'Matrix').click(); await page.waitForTimeout(300);
   const row = page.locator('tr').filter({ has: page.locator('td.sticky span.text-\\[15px\\]:text-is("Surah Mulk")') }).first();
   const label0 = await row.locator('td.sticky').innerText();
   ok(/0\/[45] wk/.test(label0), `weekly summary starts at 0 of the month's weeks (${label0.replace(/\n/g, ' ')})`);
 
   // mark done today on Daily
-  await tab(page, 'Daily').click(); await page.waitForTimeout(300);
+  await tab(page, 'Today').click(); await page.waitForTimeout(300);
   const card = dailyCard(page, 'Surah Mulk');
   ok(await card.getByText('Weekly').isVisible(), 'Daily shows a Weekly badge');
   await page.getByRole('button', { name: 'Mark Surah Mulk done' }).click(); await page.waitForTimeout(200);

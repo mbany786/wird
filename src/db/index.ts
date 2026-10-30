@@ -12,7 +12,8 @@ export const SETTING = {
   lastBackupAt: 'backup.lastAt',
   sampleDismissed: 'sample.promptDismissed',
   prayerConfig: 'prayer.config',
-  reminders: 'reminders.config'
+  reminders: 'reminders.config',
+  weekStart: 'week.start'
 } as const;
 
 export class HabitTrackerDatabase extends Dexie {

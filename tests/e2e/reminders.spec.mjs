@@ -1,8 +1,8 @@
-import { withApp, ok, summary, openMenu } from './harness.mjs';
+import { withApp, ok, summary, openMenu, openPrayerSettings } from './harness.mjs';
 
 const startFresh = async (p) => { const b = p.getByRole('button', { name: 'Start fresh' }); if (await b.count()) await b.click(); };
 const sheet = (p) => p.locator('[role="dialog"]').last();
-const openPrayer = async (p) => { await openMenu(p); await p.getByRole('button', { name: 'Prayer times & reminders…' }).click(); await p.waitForTimeout(300); };
+const openPrayer = openPrayerSettings;
 
 await withApp('Reminders: enable, plan, options, persistence', async ({ ctx, open }) => {
   await ctx.grantPermissions(['notifications']);
