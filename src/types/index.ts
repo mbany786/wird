@@ -68,6 +68,8 @@ export interface TrackerTemplate {
   urduTitle?: string;
   description: string;
   icon: string;
+  /** Accent colour key (see TEMPLATE_COLORS); defaults to emerald */
+  color?: string;
   badge: string;
   sections: HabitSection[];
   habits: Habit[];

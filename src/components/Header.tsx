@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TrackerTemplate } from '../types';
 import { getHijriDate } from '../utils/hijri';
+import { TemplateIcon, templateColor } from './templateIcons';
 import {
   Calendar,
   LayoutGrid,
@@ -8,13 +9,6 @@ import {
   BarChart3,
   SlidersHorizontal,
   Moon,
-  Activity,
-  Brain,
-  BookOpen,
-  Baby,
-  HeartPulse,
-  Sparkles,
-  PlusCircle,
   FileSpreadsheet,
   Printer,
   Mail,
@@ -41,7 +35,7 @@ interface HeaderProps {
   onExportExcel: () => void;
   onPrintPDF: () => void;
   onEmailReport: () => void;
-  onCreateBlankTemplate?: () => void;
+  onManageTemplates: () => void;
   onOpenData: () => void;
 }
 
@@ -51,19 +45,6 @@ export const VIEW_TABS: { id: AppView; label: string; Icon: typeof LayoutGrid }[
   { id: 'bi', label: 'Analytics', Icon: BarChart3 }
 ];
 
-const getIcon = (iconName: string) => {
-  const cls = 'w-5 h-5';
-  switch (iconName) {
-    case 'Moon': return <Moon className={`${cls} text-emerald-400`} />;
-    case 'Activity': return <Activity className={`${cls} text-sky-400`} />;
-    case 'Brain': return <Brain className={`${cls} text-purple-400`} />;
-    case 'BookOpen': return <BookOpen className={`${cls} text-amber-400`} />;
-    case 'Baby': return <Baby className={`${cls} text-pink-400`} />;
-    case 'HeartPulse': return <HeartPulse className={`${cls} text-rose-400`} />;
-    case 'PlusCircle': return <PlusCircle className={`${cls} text-emerald-400`} />;
-    default: return <Sparkles className={`${cls} text-emerald-400`} />;
-  }
-};
 
 export const Header: React.FC<HeaderProps> = ({
   currentTemplate,
@@ -81,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({
   onExportExcel,
   onPrintPDF,
   onEmailReport,
-  onCreateBlankTemplate,
+  onManageTemplates,
   onOpenData
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -98,8 +79,8 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto">
         {/* Row 1: template title (doubles as switcher) + tabs (tablet/desktop) + actions */}
         <div className="flex items-center gap-2 h-11">
-          <div className="hidden sm:flex p-2 rounded-xl bg-slate-800/90 border border-slate-700/80 shrink-0">
-            {getIcon(currentTemplate.icon)}
+          <div className={`hidden sm:flex p-2 rounded-xl border border-slate-700/80 shrink-0 ${templateColor(currentTemplate).bg}`}>
+            <TemplateIcon template={currentTemplate} />
           </div>
 
           {/* Title acts as the template picker: a native select sits invisibly on top of it */}
@@ -114,8 +95,8 @@ export const Header: React.FC<HeaderProps> = ({
               aria-label="Switch tracker template"
               value={currentTemplate.id}
               onChange={(e) => {
-                if (e.target.value === '__NEW_BLANK__') {
-                  onCreateBlankTemplate?.();
+                if (e.target.value === '__MANAGE__') {
+                  onManageTemplates();
                 } else {
                   const selected = templates.find(t => t.id === e.target.value);
                   if (selected) onSelectTemplate(selected);
@@ -128,8 +109,8 @@ export const Header: React.FC<HeaderProps> = ({
                   <option key={t.id} value={t.id}>{t.title}</option>
                 ))}
               </optgroup>
-              <optgroup label="New">
-                <option value="__NEW_BLANK__">+ Create blank template…</option>
+              <optgroup label="More">
+                <option value="__MANAGE__">Manage templates…</option>
               </optgroup>
             </select>
           </div>

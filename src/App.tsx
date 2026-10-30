@@ -7,7 +7,9 @@ import { MatrixGrid } from './components/MatrixGrid';
 import { DailyRoutineView } from './components/DailyRoutineView';
 import { BiAnalyticsDashboard } from './components/BiAnalyticsDashboard';
 import { CellEditorModal } from './components/CellEditorModal';
-import { TemplateCustomizerModal } from './components/TemplateCustomizerModal';
+import { StudioSheet } from './components/StudioSheet';
+import { TemplatesSheet } from './components/TemplatesSheet';
+import { newId } from './utils/templateOps';
 import { ActivityFilter, ALL_ACTIVITIES, filterHabits } from './components/ActivityFilter';
 import { downloadExcel, getEmailReportUri } from './utils/exportUtils';
 import { shareFile } from './utils/share';
@@ -45,7 +47,9 @@ export const App: React.FC = () => {
 
   const [isCustomizerOpen, setIsCustomizerOpen] = useState<boolean>(false);
   const [isDataOpen, setIsDataOpen] = useState<boolean>(false);
-  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  // Habit editor: { habit } edits, { sectionId } creates
+  const [editingHabit, setEditingHabit] = useState<{ habit?: Habit; sectionId?: string } | null>(null);
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState<boolean>(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const showToast = useCallback((t: Omit<ToastMessage, 'id'>) => setToast({ ...t, id: Date.now() }), []);
   const dismissToast = useCallback(() => setToast(null), []);
@@ -230,135 +234,57 @@ export const App: React.FC = () => {
     });
   };
 
-  // Add custom habit to current template
+  // ---------------------------------------------------------------------------
+  // Templates, sections and habits — one save path keeps state and database in sync
+  // ---------------------------------------------------------------------------
+
+  /** Saves a template (state, template list and database). Sections/habits tables mirror it. */
+  const commitTemplate = useCallback(async (updated: TrackerTemplate) => {
+    setTemplates(prev => (prev.some(t => t.id === updated.id) ? prev.map(t => (t.id === updated.id ? updated : t)) : [...prev, updated]));
+    setCurrentTemplate(cur => (cur.id === updated.id ? updated : cur));
+    await db.transaction('rw', [db.templates, db.sections, db.habits], async () => {
+      await db.templates.put(updated);
+      await db.sections.bulkPut(updated.sections);
+      await db.habits.bulkPut(updated.habits);
+    });
+  }, []);
+
+  const renumber = <T extends { order: number }>(list: T[]) => list.map((x, i) => ({ ...x, order: i + 1 }));
+
+  const commitHabits = (updatedHabits: Habit[]) => commitTemplate({ ...currentTemplate, habits: updatedHabits });
+  const commitSections = (updatedSections: HabitSection[], updatedHabits = habits) =>
+    commitTemplate({ ...currentTemplate, sections: updatedSections, habits: updatedHabits });
+
   const handleAddHabit = async (newHabit: Habit) => {
-    const updatedHabits = [...habits, newHabit];
-    setHabits(updatedHabits);
-    await db.habits.put(newHabit);
-
-    // Update in template object
-    const updatedTemplate = {
-      ...currentTemplate,
-      habits: updatedHabits
-    };
-    setCurrentTemplate(updatedTemplate);
-    setTemplates(prev => prev.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
-    await db.templates.put(updatedTemplate);
-  };
-
-  // Create a brand new blank template
-  const handleCreateBlankTemplate = async () => {
-    const newId = `custom_tracker_${Date.now()}`;
-    const newSecId = `sec_${Date.now()}_1`;
-    const newTemplate: TrackerTemplate = {
-      id: newId,
-      title: 'My Custom Tracker',
-      description: 'Personalized habit tracker. Add custom sections, tasks, or generate them via prompt.',
-      icon: 'Sparkles',
-      badge: 'Custom Canvas',
-      sections: [
-        { id: newSecId, title: 'Daily Core Routine', order: 1 }
-      ],
-      habits: [
-        { id: `habit_${Date.now()}_1`, sectionId: newSecId, title: 'Daily Focus Habit', inputType: 'BOOLEAN', category: 'POSITIVE', cadence: 'DAILY', order: 1, isCustom: true }
-      ]
-    };
-
-    await db.templates.put(newTemplate);
-    for (const s of newTemplate.sections) await db.sections.put(s);
-    for (const h of newTemplate.habits) await db.habits.put(h);
-
-    setTemplates(prev => [...prev, newTemplate]);
-    setCurrentTemplate(newTemplate);
-    setSections(newTemplate.sections);
-    setHabits(newTemplate.habits);
-    setIsCustomizerOpen(true);
-  };
-
-  // Update existing template metadata (title, badge, description)
-  const handleUpdateTemplate = async (updated: TrackerTemplate) => {
-    setCurrentTemplate(updated);
-    setSections(updated.sections);
-    setHabits(updated.habits);
-    setTemplates(prev => prev.map(t => t.id === updated.id ? updated : t));
-    await db.templates.put(updated);
-  };
-
-  // Add section to current template
-  const handleAddSection = async (title: string) => {
-    if (!title.trim()) return;
-    const newSec: HabitSection = {
-      id: `sec_${Date.now()}`,
-      title: title.trim(),
-      order: sections.length + 1
-    };
-    const updatedSections = [...sections, newSec];
-    setSections(updatedSections);
-    const updatedTemplate = { ...currentTemplate, sections: updatedSections };
-    setCurrentTemplate(updatedTemplate);
-    setTemplates(prev => prev.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
-    await db.sections.put(newSec);
-    await db.templates.put(updatedTemplate);
-  };
-
-  // Delete section
-  const handleDeleteSection = async (sectionId: string) => {
-    const updatedSections = sections.filter(s => s.id !== sectionId);
-    const updatedHabits = habits.filter(h => h.sectionId !== sectionId);
-    setSections(updatedSections);
-    setHabits(updatedHabits);
-    const updatedTemplate = { ...currentTemplate, sections: updatedSections, habits: updatedHabits };
-    setCurrentTemplate(updatedTemplate);
-    setTemplates(prev => prev.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
-    await db.sections.delete(sectionId);
-    await db.templates.put(updatedTemplate);
-  };
-
-  // Apply generated routine (sections & habits)
-  const handleApplyGeneratedRoutine = async (newSections: HabitSection[], newHabits: Habit[], newTitle?: string) => {
-    const updatedTemplate: TrackerTemplate = {
-      ...currentTemplate,
-      title: newTitle || currentTemplate.title,
-      sections: newSections,
-      habits: newHabits
-    };
-    setCurrentTemplate(updatedTemplate);
-    setSections(newSections);
-    setHabits(newHabits);
-    setTemplates(prev => prev.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
-    await db.templates.put(updatedTemplate);
-    for (const s of newSections) await db.sections.put(s);
-    for (const h of newHabits) await db.habits.put(h);
-  };
-
-  // Delete habit
-  // Save a changed habit list for the current template (state + database)
-  const commitHabits = async (updatedHabits: Habit[]) => {
-    const updatedTemplate = { ...currentTemplate, habits: updatedHabits };
-    setHabits(updatedHabits);
-    setCurrentTemplate(updatedTemplate);
-    setTemplates(prev => prev.map(t => (t.id === updatedTemplate.id ? updatedTemplate : t)));
-    await db.templates.put(updatedTemplate);
+    // New habits go to the end of their section
+    const others = habits.filter(h => h.sectionId !== newHabit.sectionId);
+    const inSection = habits.filter(h => h.sectionId === newHabit.sectionId);
+    const ordered = sections.flatMap(sec => (sec.id === newHabit.sectionId ? [...inSection, newHabit] : others.filter(h => h.sectionId === sec.id)));
+    const orphans = others.filter(h => !sections.some(sec => sec.id === h.sectionId));
+    await commitHabits(renumber([...ordered, ...orphans]));
   };
 
   const handleDeleteHabit = async (habitId: string) => {
-    await db.habits.delete(habitId);
+    await db.transaction('rw', [db.habits, db.logs], async () => {
+      await db.habits.delete(habitId);
+      await db.logs.where('habitId').equals(habitId).delete();
+    });
+    setLogs(prev => prev.filter(l => l.habitId !== habitId));
     await commitHabits(habits.filter(h => h.id !== habitId));
   };
 
   // Edit an existing habit (name, section, cadence, targets…); history stays attached by id
   const handleUpdateHabit = async (updated: Habit) => {
-    const exists = habits.some(h => h.id === updated.id);
-    if (!exists) return;
-    // Moving to another section puts it at the end of that section
-    const prev = habits.find(h => h.id === updated.id)!;
+    const prev = habits.find(h => h.id === updated.id);
+    if (!prev) return handleAddHabit(updated);
     let list = habits.map(h => (h.id === updated.id ? updated : h));
     if (prev.sectionId !== updated.sectionId) {
-      list = [...list.filter(h => h.id !== updated.id), updated];
+      // Moving to another section puts it at the end of that section
+      list = list.filter(h => h.id !== updated.id);
+      const lastIdx = list.map(h => h.sectionId).lastIndexOf(updated.sectionId);
+      list.splice(lastIdx + 1, 0, updated);
     }
-    list = list.map((h, i) => ({ ...h, order: i + 1 }));
-    await db.habits.put(list.find(h => h.id === updated.id)!);
-    await commitHabits(list);
+    await commitHabits(renumber(list));
   };
 
   // Move a habit up/down within its section
@@ -371,39 +297,98 @@ export const App: React.FC = () => {
     if (j < 0 || j >= habits.length) return;
     const list = [...habits];
     [list[idx], list[j]] = [list[j], list[idx]];
-    await commitHabits(list.map((h, i) => ({ ...h, order: i + 1 })));
+    await commitHabits(renumber(list));
   };
 
-  // Export template as JSON
-  const handleExportTemplate = () =>
+  const handleAddSection = async (title: string, urduTitle?: string) => {
+    await commitSections(renumber([...sections, { id: newId('sec'), title, urduTitle, order: 0 }]));
+  };
+
+  const handleRenameSection = async (sectionId: string, title: string, urduTitle?: string) => {
+    await commitSections(sections.map(sec => (sec.id === sectionId ? { ...sec, title, urduTitle } : sec)));
+  };
+
+  const handleMoveSection = async (sectionId: string, direction: -1 | 1) => {
+    const ordered = [...sections].sort((a, b) => a.order - b.order);
+    const i = ordered.findIndex(sec => sec.id === sectionId);
+    const j = i + direction;
+    if (i < 0 || j < 0 || j >= ordered.length) return;
+    [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+    await commitSections(renumber(ordered));
+  };
+
+  // Deleting a section deletes its habits and their entries
+  const handleDeleteSection = async (sectionId: string) => {
+    const doomed = habits.filter(h => h.sectionId === sectionId).map(h => h.id);
+    await db.transaction('rw', [db.sections, db.habits, db.logs], async () => {
+      await db.sections.delete(sectionId);
+      await db.habits.bulkDelete(doomed);
+      await db.logs.where('habitId').anyOf(doomed).delete();
+    });
+    setLogs(prev => prev.filter(l => !doomed.includes(l.habitId)));
+    await commitSections(renumber(sections.filter(sec => sec.id !== sectionId)), habits.filter(h => h.sectionId !== sectionId));
+  };
+
+  const handleSwitchTemplate = (id: string) => {
+    const t = templates.find(x => x.id === id);
+    if (t) setCurrentTemplate(t);
+  };
+
+  const handleCreateTemplate = async (t: TrackerTemplate) => {
+    await commitTemplate(t);
+    setCurrentTemplate(t);
+    showToast({ text: `Created “${t.title}”` });
+  };
+
+  // Deleting a template removes its habits and entries; built-ins are remembered as deleted
+  const handleDeleteTemplate = async (id: string) => {
+    const t = templates.find(x => x.id === id);
+    if (!t || templates.length <= 1) return;
+    const habitIds = t.habits.map(h => h.id);
+    await db.transaction('rw', [db.templates, db.sections, db.habits, db.logs, db.remarks], async () => {
+      await db.templates.delete(id);
+      await db.sections.bulkDelete(t.sections.map(sec => sec.id));
+      await db.habits.bulkDelete(habitIds);
+      await db.logs.where('habitId').anyOf(habitIds).delete();
+      await db.remarks.filter(r => r.templateId === id).delete();
+    });
+    setLogs(prev => prev.filter(l => !habitIds.includes(l.habitId)));
+    const remaining = templates.filter(x => x.id !== id);
+    setTemplates(remaining);
+    if (currentTemplate.id === id) setCurrentTemplate(remaining[0]);
+    showToast({ text: `Deleted “${t.title}”` });
+  };
+
+  const handleRestoreBuiltIn = async (id: string) => {
+    const t = TEMPLATES.find(x => x.id === id);
+    if (!t) return;
+    await commitTemplate(t);
+    setCurrentTemplate(t);
+  };
+
+  const deletedBuiltIns = useMemo(() => TEMPLATES.filter(t => !templates.some(x => x.id === t.id)), [templates]);
+
+  const entryCountByHabit = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const l of logs) if (!l.sample) m[l.habitId] = (m[l.habitId] ?? 0) + 1;
+    return m;
+  }, [logs]);
+
+  const entryCountByTemplate = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const t of templates) m[t.id] = t.habits.reduce((n, h) => n + (entryCountByHabit[h.id] ?? 0), 0);
+    return m;
+  }, [templates, entryCountByHabit]);
+
+  const exportTemplate = (t: TrackerTemplate) =>
     runExport(() =>
       shareFile({
-        filename: `${currentTemplate.title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-')}-template.json`,
-        data: JSON.stringify(currentTemplate, null, 2),
+        filename: `${t.title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-') || 'template'}-template.json`,
+        data: JSON.stringify(t, null, 2),
         mimeType: 'application/json',
-        title: `${currentTemplate.title} template`
+        title: `${t.title} template`
       })
     );
-
-  // Import custom template
-  const handleImportTemplate = async (jsonStr: string) => {
-    try {
-      const parsed: TrackerTemplate = JSON.parse(jsonStr);
-      if (!parsed.id || !parsed.title || !parsed.habits) {
-        alert('Invalid template schema format.');
-        return;
-      }
-      await db.templates.put(parsed);
-      for (const s of parsed.sections) await db.sections.put(s);
-      for (const h of parsed.habits) await db.habits.put(h);
-
-      setTemplates(prev => [...prev.filter(t => t.id !== parsed.id), parsed]);
-      setCurrentTemplate(parsed);
-      setIsCustomizerOpen(false);
-    } catch (e) {
-      alert('Failed to parse JSON file.');
-    }
-  };
 
   // Export and Share Handlers
   // Run an export and report problems (cancelling the share sheet is not a problem)
@@ -479,7 +464,7 @@ export const App: React.FC = () => {
         onExportExcel={handleExportExcel}
         onPrintPDF={handlePrintPDF}
         onEmailReport={handleEmailReport}
-        onCreateBlankTemplate={handleCreateBlankTemplate}
+        onManageTemplates={() => setIsTemplatesOpen(true)}
         onOpenData={() => setIsDataOpen(true)}
       />
 
@@ -521,9 +506,9 @@ export const App: React.FC = () => {
             onUpdateLog={handleUpdateLog}
             monthlyRemarks={monthlyRemarks}
             onRemarksChange={handleRemarksChange}
-            onAddCustomHabit={() => setIsCustomizerOpen(true)}
+            onAddCustomHabit={(sectionId) => setEditingHabit({ sectionId })}
             onRemoveHabit={handleDeleteHabit}
-            onEditHabit={(h) => setEditingHabit(h)}
+            onEditHabit={(h) => setEditingHabit({ habit: h })}
             showHijri={showHijri}
             hijriOffset={hijriOffset}
           />
@@ -597,41 +582,54 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Edit a habit (from the Studio or the Matrix quick-count panel) */}
-      {editingHabit && (
-        <HabitEditorSheet
-          habit={editingHabit}
-          sections={sections}
-          entryCount={logs.filter(l => l.habitId === editingHabit.id && !l.sample).length}
-          onSave={handleUpdateHabit}
-          onDelete={handleDeleteHabit}
-          onClose={() => setEditingHabit(null)}
-        />
-      )}
-
       <Toast toast={toast} onDismiss={dismissToast} />
 
       {/* Backup, restore, sample data */}
       {isDataOpen && <DataSheet onClose={() => setIsDataOpen(false)} onDataChanged={loadAll} />}
 
-      {/* Template Customizer Modal */}
+      {/* Templates: switch, create, duplicate, import/export, edit, delete */}
+      {isTemplatesOpen && (
+        <TemplatesSheet
+          templates={templates}
+          currentId={currentTemplate.id}
+          entryCounts={entryCountByTemplate}
+          deletedBuiltIns={deletedBuiltIns}
+          onSwitch={handleSwitchTemplate}
+          onCreate={handleCreateTemplate}
+          onUpdate={commitTemplate}
+          onDelete={handleDeleteTemplate}
+          onExport={exportTemplate}
+          onRestoreBuiltIn={handleRestoreBuiltIn}
+          onClose={() => setIsTemplatesOpen(false)}
+        />
+      )}
+
+      {/* Studio: sections and habits of the current template */}
       {isCustomizerOpen && (
-        <TemplateCustomizerModal
+        <StudioSheet
           template={currentTemplate}
-          sections={sections}
-          habits={habits}
-          onAddHabit={handleAddHabit}
-          onUpdateHabit={handleUpdateHabit}
-          onEditHabit={(h) => setEditingHabit(h)}
+          entryCountByHabit={entryCountByHabit}
+          onAddHabit={(sectionId) => setEditingHabit({ sectionId })}
+          onEditHabit={(h) => setEditingHabit({ habit: h })}
           onMoveHabit={handleMoveHabit}
-          onDeleteHabit={handleDeleteHabit}
           onAddSection={handleAddSection}
+          onRenameSection={handleRenameSection}
+          onMoveSection={handleMoveSection}
           onDeleteSection={handleDeleteSection}
-          onUpdateTemplate={handleUpdateTemplate}
-          onApplyGeneratedTemplate={handleApplyGeneratedRoutine}
           onClose={() => setIsCustomizerOpen(false)}
-          onExportTemplate={handleExportTemplate}
-          onImportTemplate={handleImportTemplate}
+        />
+      )}
+
+      {/* Habit editor (above the Studio) */}
+      {editingHabit && (
+        <HabitEditorSheet
+          habit={editingHabit.habit}
+          defaultSectionId={editingHabit.sectionId}
+          sections={sections}
+          entryCount={editingHabit.habit ? entryCountByHabit[editingHabit.habit.id] ?? 0 : 0}
+          onSave={handleUpdateHabit}
+          onDelete={handleDeleteHabit}
+          onClose={() => setEditingHabit(null)}
         />
       )}
     </div>

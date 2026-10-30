@@ -14,8 +14,9 @@ await withApp('Built-in template edits survive relaunch', async ({ ctx, open }) 
   const page = await open(ctx);
   await page.getByRole('button', { name: 'Open Template Studio' }).click();
   await page.waitForTimeout(300);
-  const row = page.locator('div.rounded-xl').filter({ has: page.locator('span.font-semibold:text-is("Tahajjud")') }).first();
-  await row.getByTitle('Delete task').click();
+  await page.getByRole('button', { name: 'Edit Tahajjud' }).click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('button', { name: 'Tap to delete' }).click();
   await page.waitForTimeout(300);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);

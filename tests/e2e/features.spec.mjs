@@ -31,9 +31,10 @@ await withApp('Exports go through share/download and produce real files', async 
   ok(pdf.subarray(0, 4).toString() === '%PDF' && pdf.length > 20000, `PDF chart created (${Math.round(pdf.length / 1024)} KB, ${pdfDl.suggestedFilename()})`);
   await (await import('node:fs/promises')).copyFile(file, '/tmp/claude-0/chart.pdf');
 
-  await studio(page);
+  await page.getByLabel('Switch tracker template').selectOption('__MANAGE__');
+  await page.getByRole('button', { name: 'Edit Daily Spiritual Schedule', exact: true }).click();
   dl = page.waitForEvent('download');
-  await page.getByRole('button', { name: /Export JSON/ }).click();
+  await page.getByRole('button', { name: 'Share file' }).click();
   file = await (await dl).path();
   const tpl = JSON.parse(await readFile(file, 'utf8'));
   ok(tpl.id === 'daily_spiritual_schedule' && tpl.habits.length > 30, 'template JSON exported');
@@ -48,7 +49,7 @@ await withApp('Edit habits: rename, cadence, lock, reorder, from Studio and Matr
   await page.getByLabel('Name', { exact: true }).fill('Surah Ya-Sin');
   await page.getByLabel('How often').selectOption('WEEKLY_ONCE');
   await page.getByRole('button', { name: 'Save', exact: true }).click(); await page.waitForTimeout(300);
-  ok(await page.locator('div.fixed.inset-0.z-50').getByText('Surah Ya-Sin').isVisible(), 'renamed in the Studio list');
+  ok(await page.locator('[role="dialog"]').getByText('Surah Ya-Sin').isVisible(), 'renamed in the Studio list');
   await page.keyboard.press('Escape'); await page.waitForTimeout(200);
   ok((await matrixRows(page)).includes('Surah Ya-Sin'), 'renamed in the Matrix');
   await page.reload({ waitUntil: 'networkidle' }); await page.waitForTimeout(700);

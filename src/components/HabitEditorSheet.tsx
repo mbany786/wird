@@ -2,14 +2,19 @@ import React, { useState } from 'react';
 import { Lock } from 'lucide-react';
 import { Sheet } from './Sheet';
 import { CadenceType, Habit, HabitCategory, HabitInputType, HabitSection } from '../types';
+import { PRAYER_STATES } from '../data/templates';
+import { newId } from '../utils/templateOps';
 
 interface HabitEditorSheetProps {
-  habit: Habit;
+  /** Existing habit to edit; omit to create a new one */
+  habit?: Habit;
+  /** Section for a new habit */
+  defaultSectionId?: string;
   sections: HabitSection[];
   /** Number of logged entries; when > 0 the tracking type is locked so history keeps its meaning */
   entryCount: number;
   onSave: (updated: Habit) => void;
-  onDelete: (habitId: string) => void;
+  onDelete?: (habitId: string) => void;
   onClose: () => void;
 }
 
@@ -31,7 +36,18 @@ const CADENCE_LABEL: Record<CadenceType, string> = {
   WEEKLY_ONCE: 'Once a week'
 };
 
-export const HabitEditorSheet: React.FC<HabitEditorSheetProps> = ({ habit, sections, entryCount, onSave, onDelete, onClose }) => {
+export const HabitEditorSheet: React.FC<HabitEditorSheetProps> = ({ habit: existing, defaultSectionId, sections, entryCount, onSave, onDelete, onClose }) => {
+  const isNew = !existing;
+  const habit: Habit = existing ?? {
+    id: newId('habit'),
+    sectionId: defaultSectionId ?? sections[0]?.id ?? '',
+    title: '',
+    inputType: 'BOOLEAN',
+    category: 'POSITIVE',
+    cadence: 'DAILY',
+    order: 9999,
+    isCustom: true
+  };
   const [title, setTitle] = useState(habit.title);
   const [urduTitle, setUrduTitle] = useState(habit.urduTitle ?? '');
   const [sectionId, setSectionId] = useState(habit.sectionId);
@@ -44,7 +60,7 @@ export const HabitEditorSheet: React.FC<HabitEditorSheetProps> = ({ habit, secti
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const typeLocked = entryCount > 0;
-  const hasStates = inputType === 'MULTI_STATE' || inputType === 'SLOT';
+  const hasStates = !isNew && (inputType === 'MULTI_STATE' || inputType === 'SLOT');
   const measured = inputType === 'QUANTITY' || inputType === 'DURATION' || inputType === 'LATAIF';
 
   const num = (v: string) => (v.trim() === '' ? undefined : Number(v));
@@ -64,7 +80,8 @@ export const HabitEditorSheet: React.FC<HabitEditorSheetProps> = ({ habit, secti
       sectionId,
       cadence,
       inputType,
-      category,
+      category: inputType === 'MULTI_STATE' ? 'POSITIVE' : category,
+      multiStates: inputType === 'MULTI_STATE' && isNew ? PRAYER_STATES : habit.multiStates,
       unit: measured ? (inputType === 'DURATION' ? 'min' : unit.trim() || undefined) : habit.unit,
       targetValue: measured ? targetN : habit.targetValue,
       step: measured ? stepN : habit.step
@@ -75,12 +92,12 @@ export const HabitEditorSheet: React.FC<HabitEditorSheetProps> = ({ habit, secti
 
   return (
     <Sheet
-      title="Edit habit"
+      title={isNew ? 'New habit' : 'Edit habit'}
       subtitle={entryCount ? `${entryCount.toLocaleString()} logged ${entryCount === 1 ? 'entry' : 'entries'} keep working after changes.` : undefined}
       onClose={onClose}
       footer={
         <div className="flex items-center gap-2">
-          {!confirmDelete ? (
+          {isNew || !onDelete ? null : !confirmDelete ? (
             <button type="button" onClick={() => setConfirmDelete(true)} className="h-11 px-3 rounded-xl text-[15px] font-semibold text-rose-300 hover:bg-rose-950/50">
               Delete
             </button>
@@ -90,7 +107,7 @@ export const HabitEditorSheet: React.FC<HabitEditorSheetProps> = ({ habit, secti
               onClick={() => { onDelete(habit.id); onClose(); }}
               className="h-11 px-3 rounded-xl text-[15px] font-semibold bg-rose-700 text-white"
             >
-              Tap to delete
+              {entryCount ? `Delete with ${entryCount} entries` : 'Tap to delete'}
             </button>
           )}
           <div className="ml-auto flex gap-2">
@@ -142,8 +159,9 @@ export const HabitEditorSheet: React.FC<HabitEditorSheetProps> = ({ habit, secti
             <div className="grid grid-cols-2 gap-3">
               <select id="he-type" className={field} value={inputType} onChange={e => setInputType(e.target.value as HabitInputType)}>
                 {(['BOOLEAN', 'QUANTITY', 'DURATION', 'LATAIF'] as HabitInputType[]).map(t => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
+                {isNew && <option value="MULTI_STATE">Prayer quality (Takbeer / Jamat / Individual / Qaza)</option>}
               </select>
-              <select aria-label="Goal" className={field} value={category} onChange={e => setCategory(e.target.value as HabitCategory)}>
+              <select aria-label="Goal" disabled={inputType === 'MULTI_STATE'} className={`${field} disabled:opacity-50`} value={category} onChange={e => setCategory(e.target.value as HabitCategory)}>
                 <option value="POSITIVE">Build (do it)</option>
                 <option value="NEGATIVE_ABSTINENCE">Avoid (0 = clean day)</option>
               </select>
