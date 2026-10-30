@@ -3,6 +3,7 @@ import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { getHijriDate } from '../utils/hijri';
 import { todayStr, addDays, parseLocalDate } from '../utils/date';
 import { AmountEntry } from './AmountEntry';
+import { isDoneLog, weekKeyOf } from '../utils/cadence';
 import { allowsCustomAmount } from '../utils/amount';
 import { 
   ChevronLeft, 
@@ -212,6 +213,14 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {sectionHabits.map(habit => {
                   const log = dailyLogsMap.get(habit.id);
+                  // Weekly habits: another completed day this week already covers it
+                  const doneThisWeekOn = habit.cadence === 'WEEKLY_ONCE'
+                    ? (() => {
+                        const wk = weekKeyOf(selectedDate);
+                        const other = logs.find(l => l.habitId === habit.id && l.date !== selectedDate && weekKeyOf(l.date) === wk && isDoneLog(habit, l));
+                        return other ? parseLocalDate(other.date).toLocaleDateString(undefined, { weekday: 'short' }) : null;
+                      })()
+                    : null;
                   const isNegative = habit.category === 'NEGATIVE_ABSTINENCE';
                   const incidents = log?.numericValue ?? (log?.status === 'FAILED' ? 1 : 0);
                   const isClean = isNegative ? (!log || (log.status !== 'FAILED' && incidents === 0)) : false;
@@ -251,6 +260,9 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                             <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 tabular-nums font-semibold">
                               {habit.unit}
                             </span>
+                          )}
+                          {habit.cadence === 'WEEKLY_ONCE' && (
+                            <span className="text-[11px] px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800/60 font-semibold">Weekly</span>
                           )}
                           {onRemoveHabit && (
                             <button
@@ -585,7 +597,11 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                       {habit.inputType === 'BOOLEAN' && (
                         <div className="flex items-center justify-between pt-1">
                           <span className="text-xs text-slate-400 font-medium">
-                            {isDone ? 'Completed for today' : 'Tap to mark done'}
+                            {isDone
+                              ? 'Completed for today'
+                              : doneThisWeekOn
+                                ? `Done this week (${doneThisWeekOn})`
+                                : habit.cadence === 'WEEKLY_ONCE' ? 'Once this week — tap when done' : 'Tap to mark done'}
                           </span>
 
                           <button
@@ -597,6 +613,8 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                 date: selectedDate
                               });
                             }}
+                            aria-label={isDone ? `Mark ${habit.title} not done` : `Mark ${habit.title} done`}
+                            aria-pressed={Boolean(isDone)}
                             className={`p-1.5 rounded-xl transition ${
                               isDone 
                                 ? 'text-emerald-400 bg-emerald-950/80 hover:bg-emerald-900' 

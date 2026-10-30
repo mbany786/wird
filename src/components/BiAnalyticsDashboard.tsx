@@ -57,7 +57,7 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
       const habitLogs = logs.filter(l => l.habitId === h.id);
       return {
         habit: h,
-        summary: calculateMonthSummary(h, habitLogs, daysInMonth)
+        summary: calculateMonthSummary(h, habitLogs, daysInMonth, currentMonth)
       };
     });
   }, [habits, logs, daysInMonth]);

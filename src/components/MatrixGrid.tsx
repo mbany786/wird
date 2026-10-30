@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { todayStr } from '../utils/date';
 import { shortExtraAmount, formatExtraAmount, allowsCustomAmount } from '../utils/amount';
+import { completedWeekKeys, weekKeyOf, weeksInMonth } from '../utils/cadence';
 import { AmountEntry } from './AmountEntry';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { calculateMonthSummary } from '../utils/analytics';
@@ -20,7 +21,8 @@ import {
   ChevronRight,
   Check,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  Pencil
 } from 'lucide-react';
 import { analyzeMenstrualCycle } from '../utils/cycleEngine';
 
@@ -36,6 +38,7 @@ interface MatrixGridProps {
   onRemarksChange: (val: string) => void;
   onAddCustomHabit: (sectionId: string) => void;
   onRemoveHabit?: (habitId: string) => void;
+  onEditHabit?: (habit: Habit) => void;
   showHijri?: boolean;
   hijriOffset?: number;
 }
@@ -52,6 +55,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
   onRemarksChange,
   onAddCustomHabit,
   onRemoveHabit,
+  onEditHabit,
   showHijri = false,
   hijriOffset = 0
 }) => {
@@ -182,6 +186,19 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
   const handleAdjustBooleanCount = (habit: Habit, delta: 1 | -1) => {
     if (!onUpdateLog) return;
     const candidateDays = habit.cadence === 'FRIDAY_ONLY' ? fridayDays : daysArray;
+    if (delta === 1 && habit.cadence === 'WEEKLY_ONCE') {
+      // One completed day per week: the active day if its week is open, else the next open week
+      const doneWeeks = completedWeekKeys(habit, logs.filter(l => l.habitId === habit.id));
+      const pick = !doneWeeks.has(weekKeyOf(activeDateStr))
+        ? safeActiveDay
+        : weeksInMonth(currentMonth).find(w => !doneWeeks.has(w.key))?.days[0];
+      if (pick === undefined) return;
+      const dStr = `${currentMonth}-${String(pick).padStart(2, '0')}`;
+      onUpdateLog(habit.id, { status: 'COMPLETED', numericValue: 1, date: dStr });
+      setActiveDay(pick);
+      setSelectedCell({ habit, day: pick, date: dStr });
+      return;
+    }
     if (delta === 1) {
       const activeValid = habit.cadence !== 'FRIDAY_ONLY' || fridayDays.includes(safeActiveDay);
       const activeEntry = logMap.get(`${habit.id}:${activeDateStr}`);
@@ -352,8 +369,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
     if (habit.category === 'NEGATIVE_ABSTINENCE') return `${fmt(summary.totalVolume)} ${habit.unit || 'slips'}`;
     if (habit.inputType === 'QUANTITY' || habit.inputType === 'LATAIF') return `Σ ${fmt(summary.totalVolume)}`;
     if (habit.inputType === 'DURATION') return `${fmt(summary.totalVolume)}m`;
-    const possible = habit.cadence === 'FRIDAY_ONLY' ? fridayDays.length : daysInMonth;
-    return `${summary.totalLoggedDays}/${possible}`;
+    return `${summary.periodsDone}/${summary.possible}${habit.cadence === 'WEEKLY_ONCE' ? ' wk' : ''}`;
   };
 
   // Group habits by section
@@ -855,7 +871,8 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                     {/* Section Habits Rows */}
                     {sectionHabits.map(habit => {
                       const habitLogsForMonth = logs.filter(l => l.habitId === habit.id);
-                      const summary = calculateMonthSummary(habit, habitLogsForMonth, daysInMonth);
+                      const summary = calculateMonthSummary(habit, habitLogsForMonth, daysInMonth, currentMonth);
+                      const doneWeeks = habit.cadence === 'WEEKLY_ONCE' ? completedWeekKeys(habit, habitLogsForMonth) : null;
                       const activeDayLog = logMap.get(`${habit.id}:${activeDateStr}`);
                       const isHabitSelected = selectedCell?.habit.id === habit.id;
 
@@ -1017,8 +1034,8 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                         <Minus className="w-3 h-3" />
                                       </button>
                                       <span className="text-[11px] tabular-nums font-bold text-emerald-400 px-1">
-                                        {summary.totalLoggedDays}
-                                        <span className="text-slate-500 font-normal">/{habit.cadence === 'FRIDAY_ONLY' ? fridayDays.length : daysInMonth}</span>
+                                        {summary.periodsDone}
+                                        <span className="text-slate-500 font-normal">/{summary.possible}{habit.cadence === 'WEEKLY_ONCE' ? ' wk' : ''}</span>
                                       </span>
                                       <button
                                         type="button"
@@ -1128,7 +1145,11 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                 title={`Day ${d}: Tap to edit count`}
                               >
                                 <div className="w-full min-h-[28px] flex items-center justify-center">
-                                  {renderCellContent(habit, d)}
+                                  {!cellLog && doneWeeks?.has(weekKeyOf(dateStr)) ? (
+                                    <span className="text-[13px] text-emerald-700" title="Done this week">✓</span>
+                                  ) : (
+                                    renderCellContent(habit, d)
+                                  )}
                                 </div>
                               </td>
                             );
@@ -1291,11 +1312,11 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                                     </button>
                                     <div>
                                       <span className="text-emerald-400 font-bold">
-                                        {summary.totalLoggedDays}
+                                        {summary.periodsDone}
                                       </span>
                                       <span className="text-slate-500">/</span>
                                       <span className="text-slate-400">
-                                        {habit.cadence === 'FRIDAY_ONLY' ? fridayDays.length : daysInMonth}
+                                        {summary.possible}{habit.cadence === 'WEEKLY_ONCE' ? ' wk' : ''}
                                       </span>
                                       <span className="text-[11px] text-slate-500 ml-1">
                                         ({summary.completionRate}%)
@@ -1877,6 +1898,16 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
+              {onEditHabit && (
+                <button
+                  onClick={() => onEditHabit(selectedCell.habit)}
+                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+                  aria-label="Edit habit"
+                  title="Edit habit"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={() => onCellClick(selectedCell.habit, selectedCell.date, selectedCell.day)}
                 className="flex items-center justify-center gap-1 min-w-[40px] h-10 px-2 sm:px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[13px] font-semibold transition"
@@ -2449,7 +2480,10 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                   <Minus className="w-4 h-4" />
                 </button>
                 <span className="text-base tabular-nums font-bold text-emerald-400 px-2">
-                  {logs.filter(l => l.habitId === selectedCell.habit.id && l.status === 'COMPLETED').length} / {selectedCell.habit.cadence === 'FRIDAY_ONLY' ? fridayDays.length : daysInMonth}
+                  {(() => {
+                    const sum = calculateMonthSummary(selectedCell.habit, logs.filter(l => l.habitId === selectedCell.habit.id), daysInMonth, currentMonth);
+                    return `${sum.periodsDone} / ${sum.possible}${selectedCell.habit.cadence === 'WEEKLY_ONCE' ? ' weeks' : ''}`;
+                  })()}
                 </span>
                 <button
                   type="button"

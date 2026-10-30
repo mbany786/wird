@@ -231,8 +231,8 @@ export const Header: React.FC<HeaderProps> = ({
                     )}
 
                     {[
-                      { label: 'Export to Excel', Icon: FileSpreadsheet, fn: onExportExcel },
-                      { label: 'Print or save PDF', Icon: Printer, fn: onPrintPDF },
+                      { label: 'Share as Excel', Icon: FileSpreadsheet, fn: onExportExcel },
+                      { label: 'Share monthly chart (PDF)', Icon: Printer, fn: onPrintPDF },
                       { label: 'Email monthly report', Icon: Mail, fn: onEmailReport },
                       { label: 'Backup & data…', Icon: DatabaseBackup, fn: onOpenData }
                     ].map(({ label, Icon, fn }) => (

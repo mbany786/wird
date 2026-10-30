@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { Habit, HabitSection, HabitInputType, CadenceType, TrackerTemplate } from '../types';
-import { 
-  X, 
-  Plus, 
-  Trash2, 
-  Download, 
-  Upload, 
-  Check, 
-  Sparkles, 
-  SlidersHorizontal, 
-  Layers, 
-  Wand2, 
-  FolderPlus, 
+import {
+  X,
+  Plus,
+  Trash2,
+  Download,
+  Upload,
+  Check,
+  Sparkles,
+  SlidersHorizontal,
+  Layers,
+  Wand2,
+  FolderPlus,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 
 interface TemplateCustomizerModalProps {
@@ -23,6 +25,8 @@ interface TemplateCustomizerModalProps {
   onAddHabit: (habit: Habit) => void;
   onUpdateHabit: (habit: Habit) => void;
   onDeleteHabit: (habitId: string) => void;
+  onEditHabit?: (habit: Habit) => void;
+  onMoveHabit?: (habitId: string, direction: -1 | 1) => void;
   onAddSection?: (title: string) => void;
   onDeleteSection?: (sectionId: string) => void;
   onUpdateTemplate?: (updated: TrackerTemplate) => void;
@@ -157,6 +161,8 @@ export const TemplateCustomizerModal: React.FC<TemplateCustomizerModalProps> = (
   onAddHabit,
   onUpdateHabit,
   onDeleteHabit,
+  onEditHabit,
+  onMoveHabit,
   onAddSection,
   onDeleteSection,
   onUpdateTemplate,
@@ -449,7 +455,7 @@ export const TemplateCustomizerModal: React.FC<TemplateCustomizerModalProps> = (
                       </div>
                     ) : (
                       <div className="space-y-1.5">
-                        {secHabits.map(habit => (
+                        {secHabits.map((habit, idx) => (
                           <div
                             key={habit.id}
                             className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs hover:border-slate-700 transition"
@@ -474,13 +480,44 @@ export const TemplateCustomizerModal: React.FC<TemplateCustomizerModalProps> = (
                               )}
                             </div>
 
-                            <button
-                              onClick={() => onDeleteHabit(habit.id)}
-                              className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-900 transition"
-                              title="Delete task"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              {onMoveHabit && (
+                                <>
+                                  <button
+                                    onClick={() => onMoveHabit(habit.id, -1)}
+                                    disabled={idx === 0}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 disabled:opacity-30"
+                                    aria-label={`Move ${habit.title} up`}
+                                  >
+                                    <ChevronUp className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => onMoveHabit(habit.id, 1)}
+                                    disabled={idx === secHabits.length - 1}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 disabled:opacity-30"
+                                    aria-label={`Move ${habit.title} down`}
+                                  >
+                                    <ChevronDown className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                              {onEditHabit && (
+                                <button
+                                  onClick={() => onEditHabit(habit)}
+                                  className="h-8 px-2.5 rounded-lg text-[13px] font-semibold text-emerald-300 hover:bg-slate-900"
+                                  aria-label={`Edit ${habit.title}`}
+                                >
+                                  Edit
+                                </button>
+                              )}
+                              <button
+                                onClick={() => onDeleteHabit(habit.id)}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-900 transition"
+                                title="Delete task"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>

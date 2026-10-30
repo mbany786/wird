@@ -1,4 +1,5 @@
 import { Habit, HabitLog } from '../types';
+import { completedWeekKeys, fridaysInMonth, isDoneLog, possibleInMonth, weeksInMonth } from './cadence';
 
 export interface HabitSummary {
   habitId: string;
@@ -11,6 +12,10 @@ export interface HabitSummary {
   strengthScore: number;  // 0 to 100%
   currentStreak: number;
   longestStreak: number;
+  /** Chances in the month: days, Fridays or weeks depending on cadence */
+  possible: number;
+  /** Chances met: logged days (prayers), done days, clean days (inverse habits) or done weeks */
+  periodsDone: number;
 }
 
 export const LATAIF_COUNT_TO_MIN = (count: number) => Math.round((count * 30) / 5000);
@@ -69,8 +74,10 @@ export function calculateHabitStrength(logs: HabitLog[], habit: Habit): number {
 export function calculateMonthSummary(
   habit: Habit, 
   logsForMonth: HabitLog[], 
-  daysInMonth: number
+  daysInMonth: number,
+  monthKey?: string
 ): HabitSummary {
+  const month = monthKey ?? logsForMonth[0]?.date.slice(0, 7);
   let totalVolume = 0;
   let successWeightSum = 0;
   const multiStateCounts: Record<string, number> = {};
@@ -112,7 +119,7 @@ export function calculateMonthSummary(
   logsForMonth.forEach(l => logMap.set(l.date, l));
 
   // Determine eligible days
-  const eligibleDays = habit.cadence === 'FRIDAY_ONLY' ? 4 : daysInMonth;
+  const eligibleDays = month ? possibleInMonth(habit, month) : (habit.cadence === 'FRIDAY_ONLY' ? 4 : daysInMonth);
 
   const isNegative = habit.category === 'NEGATIVE_ABSTINENCE';
   let cleanDaysCount = 0;
@@ -148,9 +155,36 @@ export function calculateMonthSummary(
   currentStreak = tempStreak;
 
   const strength = calculateHabitStrength(logsForMonth, habit);
-  const completionRate = isNegative 
+  let completionRate = isNegative 
     ? Math.round((cleanDaysCount / daysInMonth) * 100)
     : Math.min(100, Math.round((successWeightSum / Math.max(1, eligibleDays)) * 100));
+
+  // Chances met in the month
+  let periodsDone: number;
+  if (isNegative) {
+    periodsDone = cleanDaysCount;
+  } else if (habit.inputType === 'MULTI_STATE' || habit.inputType === 'SLOT') {
+    periodsDone = logsForMonth.filter(l => l.status !== 'SKIPPED' && l.stateCode).length;
+  } else {
+    periodsDone = logsForMonth.filter(l => isDoneLog(habit, l)).length;
+  }
+
+  // Weekly habits: one completed day covers the week; streaks count in weeks
+  if (habit.cadence === 'WEEKLY_ONCE' && month && !isNegative) {
+    const weeks = weeksInMonth(month);
+    const done = completedWeekKeys(habit, logsForMonth);
+    periodsDone = weeks.filter(w => done.has(w.key)).length;
+    completionRate = Math.round((periodsDone / Math.max(1, weeks.length)) * 100);
+    let run = 0;
+    longestStreak = 0;
+    for (const w of weeks) {
+      if (done.has(w.key)) { run++; longestStreak = Math.max(longestStreak, run); } else run = 0;
+    }
+    currentStreak = run;
+  } else if (habit.cadence === 'FRIDAY_ONLY' && month && !isNegative) {
+    const fridays = new Set(fridaysInMonth(month).map(d => `${month}-${String(d).padStart(2, '0')}`));
+    periodsDone = logsForMonth.filter(l => fridays.has(l.date) && (habit.multiStates ? l.status !== 'SKIPPED' && !!l.stateCode : isDoneLog(habit, l))).length;
+  }
 
   return {
     habitId: habit.id,
@@ -162,7 +196,9 @@ export function calculateMonthSummary(
     multiStateCounts,
     strengthScore: strength,
     currentStreak,
-    longestStreak
+    longestStreak,
+    possible: eligibleDays,
+    periodsDone
   };
 }
 

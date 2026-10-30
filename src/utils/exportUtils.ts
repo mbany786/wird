@@ -3,8 +3,9 @@ import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { calculateMonthSummary } from './analytics';
 import { getHijriDate } from './hijri';
 import { allowsCustomAmount } from './amount';
+import { shareFile } from './share';
 
-export function downloadExcel(
+export async function downloadExcel(
   template: TrackerTemplate,
   habits: Habit[],
   sections: HabitSection[],
@@ -41,7 +42,7 @@ export function downloadExcel(
     const secHabits = habits.filter(h => h.sectionId === s.id);
     for (const h of secHabits) {
       const habitLogs = logs.filter(l => l.habitId === h.id);
-      const summary = calculateMonthSummary(h, habitLogs, daysInMonth);
+      const summary = calculateMonthSummary(h, habitLogs, daysInMonth, currentMonth);
 
       const row: any[] = [
         s.title,
@@ -126,12 +127,14 @@ export function downloadExcel(
     XLSX.utils.book_append_sheet(wb, remarksSheet, 'Monthly Notes');
   }
 
-  // Download
-  XLSX.writeFile(wb, `${template.id}_${currentMonth}.xlsx`);
-}
-
-export function printPDF() {
-  window.print();
+  // Hand the file to the share sheet (downloads don't work inside the iOS app)
+  const bytes = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+  return shareFile({
+    filename: `${template.title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-')}-${currentMonth}.xlsx`,
+    data: bytes,
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    title: `${template.title} — ${currentMonth}`
+  });
 }
 
 export function getEmailReportUri(
@@ -149,7 +152,7 @@ export function getEmailReportUri(
 
   for (const h of habits.slice(0, 10)) {
     const hLogs = logs.filter(l => l.habitId === h.id);
-    const sum = calculateMonthSummary(h, hLogs, daysInMonth);
+    const sum = calculateMonthSummary(h, hLogs, daysInMonth, currentMonth);
     let stat = `${sum.totalLoggedDays}/${daysInMonth} days (${sum.completionRate}%)`;
     if (h.inputType === 'QUANTITY') stat = `${sum.totalVolume} ${h.unit || ''} (avg: ${sum.dailyAverage}/d)`;
     if (h.inputType === 'DURATION') stat = `${sum.totalVolume} min (${(sum.totalVolume / 60).toFixed(1)} hrs)`;

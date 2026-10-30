@@ -9,9 +9,13 @@ import { BiAnalyticsDashboard } from './components/BiAnalyticsDashboard';
 import { CellEditorModal } from './components/CellEditorModal';
 import { TemplateCustomizerModal } from './components/TemplateCustomizerModal';
 import { ActivityFilter, ALL_ACTIVITIES, filterHabits } from './components/ActivityFilter';
-import { downloadExcel, printPDF, getEmailReportUri } from './utils/exportUtils';
+import { downloadExcel, getEmailReportUri } from './utils/exportUtils';
+import { shareFile } from './utils/share';
+import { monthChartPdf } from './utils/monthChart';
+import { Toast, ToastMessage } from './components/Toast';
 import { todayStr, currentMonthStr } from './utils/date';
 import { DataSheet } from './components/DataSheet';
+import { HabitEditorSheet } from './components/HabitEditorSheet';
 import { SampleDataPrompt } from './components/SampleDataPrompt';
 
 export const App: React.FC = () => {
@@ -41,6 +45,10 @@ export const App: React.FC = () => {
 
   const [isCustomizerOpen, setIsCustomizerOpen] = useState<boolean>(false);
   const [isDataOpen, setIsDataOpen] = useState<boolean>(false);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const showToast = useCallback((t: Omit<ToastMessage, 'id'>) => setToast({ ...t, id: Date.now() }), []);
+  const dismissToast = useCallback(() => setToast(null), []);
 
   // True once stored data + settings have loaded (prevents saving defaults over stored settings)
   const [ready, setReady] = useState<boolean>(false);
@@ -324,30 +332,58 @@ export const App: React.FC = () => {
   };
 
   // Delete habit
-  const handleDeleteHabit = async (habitId: string) => {
-    const updatedHabits = habits.filter(h => h.id !== habitId);
+  // Save a changed habit list for the current template (state + database)
+  const commitHabits = async (updatedHabits: Habit[]) => {
+    const updatedTemplate = { ...currentTemplate, habits: updatedHabits };
     setHabits(updatedHabits);
-    await db.habits.delete(habitId);
-
-    const updatedTemplate = {
-      ...currentTemplate,
-      habits: updatedHabits
-    };
     setCurrentTemplate(updatedTemplate);
+    setTemplates(prev => prev.map(t => (t.id === updatedTemplate.id ? updatedTemplate : t)));
     await db.templates.put(updatedTemplate);
   };
 
-  // Export template as JSON
-  const handleExportTemplate = () => {
-    const jsonStr = JSON.stringify(currentTemplate, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${currentTemplate.id}_template.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDeleteHabit = async (habitId: string) => {
+    await db.habits.delete(habitId);
+    await commitHabits(habits.filter(h => h.id !== habitId));
   };
+
+  // Edit an existing habit (name, section, cadence, targets…); history stays attached by id
+  const handleUpdateHabit = async (updated: Habit) => {
+    const exists = habits.some(h => h.id === updated.id);
+    if (!exists) return;
+    // Moving to another section puts it at the end of that section
+    const prev = habits.find(h => h.id === updated.id)!;
+    let list = habits.map(h => (h.id === updated.id ? updated : h));
+    if (prev.sectionId !== updated.sectionId) {
+      list = [...list.filter(h => h.id !== updated.id), updated];
+    }
+    list = list.map((h, i) => ({ ...h, order: i + 1 }));
+    await db.habits.put(list.find(h => h.id === updated.id)!);
+    await commitHabits(list);
+  };
+
+  // Move a habit up/down within its section
+  const handleMoveHabit = async (habitId: string, direction: -1 | 1) => {
+    const idx = habits.findIndex(h => h.id === habitId);
+    if (idx < 0) return;
+    const sectionId = habits[idx].sectionId;
+    let j = idx + direction;
+    while (j >= 0 && j < habits.length && habits[j].sectionId !== sectionId) j += direction;
+    if (j < 0 || j >= habits.length) return;
+    const list = [...habits];
+    [list[idx], list[j]] = [list[j], list[idx]];
+    await commitHabits(list.map((h, i) => ({ ...h, order: i + 1 })));
+  };
+
+  // Export template as JSON
+  const handleExportTemplate = () =>
+    runExport(() =>
+      shareFile({
+        filename: `${currentTemplate.title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-')}-template.json`,
+        data: JSON.stringify(currentTemplate, null, 2),
+        mimeType: 'application/json',
+        title: `${currentTemplate.title} template`
+      })
+    );
 
   // Import custom template
   const handleImportTemplate = async (jsonStr: string) => {
@@ -370,22 +406,48 @@ export const App: React.FC = () => {
   };
 
   // Export and Share Handlers
-  const handleExportExcel = () => {
-    downloadExcel(
-      currentTemplate,
-      habits,
-      sections,
-      logs.filter(l => l.date.startsWith(currentMonth)),
-      currentMonth,
-      monthlyRemarks,
-      showHijri,
-      hijriOffset
-    );
+  // Run an export and report problems (cancelling the share sheet is not a problem)
+  const runExport = async (fn: () => Promise<unknown>) => {
+    try {
+      await fn();
+    } catch (e) {
+      showToast({ text: `Couldn't export: ${(e as Error).message || 'unknown error'}`, tone: 'error' });
+    }
   };
 
-  const handlePrintPDF = () => {
-    printPDF();
-  };
+  const handleExportExcel = () =>
+    runExport(() =>
+      downloadExcel(
+        currentTemplate,
+        habits,
+        sections,
+        logs.filter(l => l.date.startsWith(currentMonth)),
+        currentMonth,
+        monthlyRemarks,
+        showHijri,
+        hijriOffset
+      )
+    );
+
+  const handlePrintPDF = () =>
+    runExport(async () => {
+      const bytes = await monthChartPdf({
+        template: currentTemplate,
+        sections,
+        habits,
+        logs: logs.filter(l => l.date.startsWith(currentMonth)),
+        monthKey: currentMonth,
+        remarks: monthlyRemarks,
+        showHijri,
+        hijriOffset
+      });
+      return shareFile({
+        filename: `${currentTemplate.title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-')}-${currentMonth}.pdf`,
+        data: bytes,
+        mimeType: 'application/pdf',
+        title: `${currentTemplate.title} — ${currentMonth}`
+      });
+    });
 
   const handleEmailReport = () => {
     const uri = getEmailReportUri(
@@ -461,6 +523,7 @@ export const App: React.FC = () => {
             onRemarksChange={handleRemarksChange}
             onAddCustomHabit={() => setIsCustomizerOpen(true)}
             onRemoveHabit={handleDeleteHabit}
+            onEditHabit={(h) => setEditingHabit(h)}
             showHijri={showHijri}
             hijriOffset={hijriOffset}
           />
@@ -534,6 +597,20 @@ export const App: React.FC = () => {
         />
       )}
 
+      {/* Edit a habit (from the Studio or the Matrix quick-count panel) */}
+      {editingHabit && (
+        <HabitEditorSheet
+          habit={editingHabit}
+          sections={sections}
+          entryCount={logs.filter(l => l.habitId === editingHabit.id && !l.sample).length}
+          onSave={handleUpdateHabit}
+          onDelete={handleDeleteHabit}
+          onClose={() => setEditingHabit(null)}
+        />
+      )}
+
+      <Toast toast={toast} onDismiss={dismissToast} />
+
       {/* Backup, restore, sample data */}
       {isDataOpen && <DataSheet onClose={() => setIsDataOpen(false)} onDataChanged={loadAll} />}
 
@@ -544,7 +621,9 @@ export const App: React.FC = () => {
           sections={sections}
           habits={habits}
           onAddHabit={handleAddHabit}
-          onUpdateHabit={() => {}}
+          onUpdateHabit={handleUpdateHabit}
+          onEditHabit={(h) => setEditingHabit(h)}
+          onMoveHabit={handleMoveHabit}
           onDeleteHabit={handleDeleteHabit}
           onAddSection={handleAddSection}
           onDeleteSection={handleDeleteSection}

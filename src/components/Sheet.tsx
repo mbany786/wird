@@ -28,7 +28,7 @@ export const Sheet: React.FC<SheetProps> = ({ title, subtitle, onClose, children
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={title}>
+    <div className="fixed inset-0 z-[55] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" aria-label="Close" className="absolute inset-0 cursor-default" onClick={onClose} />
       <div
         className={`relative w-full ${wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'} bg-slate-900 border border-slate-700/80 sm:rounded-2xl rounded-t-2xl shadow-2xl text-slate-100 flex flex-col max-h-[calc(100dvh-env(safe-area-inset-top)-12px)] sm:max-h-[88vh]`}
