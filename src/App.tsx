@@ -616,6 +616,7 @@ export const App: React.FC = () => {
             habits={visibleHabits}
             logs={logs.filter(l => l.date.startsWith(currentMonth))}
             currentMonth={currentMonth}
+            allLogs={logs}
           />
         )}
       </main>

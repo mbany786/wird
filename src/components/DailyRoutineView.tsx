@@ -375,7 +375,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                         date: selectedDate
                                       });
                                     }}
-                                    className="px-2 py-1 rounded-lg bg-rose-900 hover:bg-rose-800 text-rose-200 text-xs font-bold border border-rose-700 transition"
+                                    className="h-9 px-3 rounded-lg bg-rose-900 hover:bg-rose-800 text-rose-200 text-[13px] font-bold border border-rose-700 transition"
                                   >
                                     +{habit.inputType === 'DURATION' ? '15m' : '1 More'}
                                   </button>
@@ -387,7 +387,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                         date: selectedDate
                                       });
                                     }}
-                                    className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition"
+                                    className="h-9 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[13px] font-medium transition"
                                     title="Reset to 0 incidents"
                                   >
                                     Reset to 0
@@ -446,9 +446,9 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                   date: selectedDate
                                 });
                               }}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                              className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
                             >
-                              <Minus className="w-3.5 h-3.5" />
+                              <Minus className="w-4 h-4" />
                             </button>
 
                             <span className="text-base font-bold text-emerald-400 tabular-nums px-2">
@@ -465,9 +465,9 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                   date: selectedDate
                                 });
                               }}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                              className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
                             >
-                              <Plus className="w-3.5 h-3.5" />
+                              <Plus className="w-4 h-4" />
                             </button>
                           </div>
 
@@ -484,7 +484,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                     date: selectedDate
                                   });
                                 }}
-                                className="px-2 py-1 rounded-lg bg-emerald-950 text-emerald-300 font-bold text-[11px] border border-emerald-800 hover:bg-emerald-900"
+                                className="h-10 px-3 rounded-lg bg-emerald-950 text-emerald-300 font-bold text-[13px] border border-emerald-800 hover:bg-emerald-900"
                               >
                                 +100
                               </button>
@@ -499,7 +499,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                     date: selectedDate
                                   });
                                 }}
-                                className="px-2 py-1 rounded-lg bg-emerald-950 text-emerald-300 font-bold text-[11px] border border-emerald-800 hover:bg-emerald-900"
+                                className="h-10 px-3 rounded-lg bg-emerald-950 text-emerald-300 font-bold text-[13px] border border-emerald-800 hover:bg-emerald-900"
                               >
                                 +5
                               </button>
@@ -551,7 +551,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                   date: selectedDate
                                 });
                               }}
-                              className="px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 transition"
+                              className="h-9 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[13px] font-semibold text-slate-300 transition"
                             >
                               2.5k (15m)
                             </button>
@@ -566,7 +566,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                   date: selectedDate
                                 });
                               }}
-                              className="px-1.5 py-1 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-[11px] font-bold text-emerald-300 transition"
+                              className="h-9 px-2.5 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-[13px] font-bold text-emerald-300 transition"
                             >
                               5k (30m) ✓
                             </button>
@@ -581,7 +581,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                   date: selectedDate
                                 });
                               }}
-                              className="px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 transition"
+                              className="h-9 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[13px] font-semibold text-slate-300 transition"
                             >
                               7.5k (45m)
                             </button>
@@ -596,7 +596,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                   date: selectedDate
                                 });
                               }}
-                              className="px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 transition"
+                              className="h-9 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[13px] font-semibold text-slate-300 transition"
                             >
                               10k (60m)
                             </button>
@@ -627,7 +627,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                                     date: selectedDate
                                   });
                                 }}
-                                className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                                className="h-9 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[13px] font-semibold"
                               >
                                 {mins}m
                               </button>

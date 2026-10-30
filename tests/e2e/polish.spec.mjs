@@ -62,4 +62,24 @@ await withApp('Settings: one place, stacked sheets, week start', async ({ ctx, o
   ok(await p.locator('[role="dialog"]').count() === 0, 'second Escape closes Settings');
 });
 
+await withApp('Analytics beyond one month', async ({ ctx, open }) => {
+  const p = await open(ctx);
+  await p.getByRole('button', { name: 'Explore with sample data' }).click(); await p.waitForTimeout(2500);
+  await tab(p, 'Analytics').click(); await p.waitForTimeout(800);
+  ok(await p.getByTestId('long-term').isVisible(), 'long-term section shown');
+  ok(await p.getByRole('radio', { name: '3 mo' }).getAttribute('aria-checked') === 'true', 'range starts at the shortest that covers the history');
+  ok((await p.getByLabel('Insights').locator('li').count()) >= 1, `plain-language insights (${(await p.getByLabel('Insights').innerText()).split('\n').filter(Boolean)[0]})`);
+  const bars = p.getByRole('list', { name: 'Monthly completion' }).getByRole('listitem');
+  ok(await bars.count() === 3, 'three monthly bars');
+  await p.getByRole('radio', { name: '1 yr' }).click(); await p.waitForTimeout(300);
+  ok(await bars.count() === 12, 'a year shows twelve months');
+  const prev = await bars.nth(10).getAttribute('aria-label');
+  ok(/\d+%/.test(prev), `last month has a score (${prev})`);
+  const day = p.getByRole('grid', { name: 'Daily completion' }).getByRole('button', { name: /: \d+ of \d+/ }).last();
+  await day.click();
+  ok(/of \d+ \(\d+%\)/.test(await p.getByTestId('heat-picked').innerText()), `tapping a day explains it (${await p.getByTestId('heat-picked').innerText()})`);
+  ok(await p.getByLabel('Prayer quality').locator('[role="img"]').count() === 5, 'prayer quality for all five prayers');
+  ok(await p.getByRole('list', { name: 'Streaks' }).locator('li').count() >= 3, 'streaks across months listed');
+});
+
 summary();

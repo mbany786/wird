@@ -16,6 +16,8 @@ import {
   Heart,
   HeartPulse
 } from 'lucide-react';
+import { LongTermAnalytics } from './LongTermAnalytics';
+import { todayStr as localToday } from '../utils/date';
 import { analyzeMenstrualCycle } from '../utils/cycleEngine';
 
 interface BiAnalyticsDashboardProps {
@@ -23,13 +25,16 @@ interface BiAnalyticsDashboardProps {
   habits: Habit[];
   logs: HabitLog[];
   currentMonth: string; // YYYY-MM
+  /** Every entry (all months) for the long-term view */
+  allLogs?: HabitLog[];
 }
 
 export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
   template,
   habits,
   logs,
-  currentMonth
+  currentMonth,
+  allLogs
 }) => {
   const isSpiritualTemplate = template.id === 'daily_spiritual_schedule';
   const isHealthTemplate = template.id === 'complete_health_fitness';
@@ -40,7 +45,7 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
   const [year, month] = currentMonth.split('-').map(Number);
   const daysInMonth = useMemo(() => new Date(year, month, 0).getDate(), [year, month]);
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => localToday(), []);
   const cycleTargetDate = useMemo(() => {
     if (todayStr.startsWith(currentMonth)) return todayStr;
     return `${currentMonth}-15`;
@@ -134,6 +139,8 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      {allLogs && <LongTermAnalytics habits={habits} logs={allLogs} currentMonth={currentMonth} />}
+      {allLogs && <h2 className="text-[17px] font-semibold text-slate-100 pt-2">This month</h2>}
       {/* Template-Specific Macro KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Overall Strength Index */}
