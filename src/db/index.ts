@@ -10,7 +10,9 @@ export const SETTING = {
   hijriOffset: 'hijri.offset',
   knownDefaults: 'defaults.knownIds',
   lastBackupAt: 'backup.lastAt',
-  sampleDismissed: 'sample.promptDismissed'
+  sampleDismissed: 'sample.promptDismissed',
+  prayerConfig: 'prayer.config',
+  reminders: 'reminders.config'
 } as const;
 
 export class HabitTrackerDatabase extends Dexie {

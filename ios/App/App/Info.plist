@@ -70,5 +70,7 @@
 	<string>public.app-category.lifestyle</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Wird uses your location once to calculate prayer times. It stays on this device and is never shared.</string>
 </dict>
 </plist>

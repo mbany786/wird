@@ -10,6 +10,8 @@ import { CellEditorModal } from './components/CellEditorModal';
 import { StudioSheet } from './components/StudioSheet';
 import { TemplatesSheet } from './components/TemplatesSheet';
 import { newId } from './utils/templateOps';
+import { DEFAULT_PRAYER_CONFIG, PrayerConfig } from './utils/prayerTimes';
+import { PrayerSettingsSheet } from './components/PrayerSettingsSheet';
 import { ActivityFilter, ALL_ACTIVITIES, filterHabits } from './components/ActivityFilter';
 import { downloadExcel, getEmailReportUri } from './utils/exportUtils';
 import { shareFile } from './utils/share';
@@ -50,6 +52,8 @@ export const App: React.FC = () => {
   // Habit editor: { habit } edits, { sectionId } creates
   const [editingHabit, setEditingHabit] = useState<{ habit?: Habit; sectionId?: string } | null>(null);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState<boolean>(false);
+  const [isPrayerOpen, setIsPrayerOpen] = useState<boolean>(false);
+  const [prayerConfig, setPrayerConfig] = useState<PrayerConfig>(DEFAULT_PRAYER_CONFIG);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const showToast = useCallback((t: Omit<ToastMessage, 'id'>) => setToast({ ...t, id: Date.now() }), []);
   const dismissToast = useCallback(() => setToast(null), []);
@@ -79,6 +83,7 @@ export const App: React.FC = () => {
       db.getSetting<number>(SETTING.hijriOffset, 0),
       db.getSetting<boolean>(SETTING.sampleDismissed, false)
     ]);
+    setPrayerConfig({ ...DEFAULT_PRAYER_CONFIG, ...(await db.getSetting<PrayerConfig | null>(SETTING.prayerConfig, null)) });
 
     if (dbTemplates.length > 0) {
       // Keep built-in templates in their defined order, then the user's own
@@ -106,6 +111,7 @@ export const App: React.FC = () => {
   useEffect(() => { if (ready) db.setSetting(SETTING.currentTemplateId, currentTemplate.id); }, [ready, currentTemplate.id]);
   useEffect(() => { if (ready) db.setSetting(SETTING.showHijri, showHijri); }, [ready, showHijri]);
   useEffect(() => { if (ready) db.setSetting(SETTING.hijriOffset, hijriOffset); }, [ready, hijriOffset]);
+  useEffect(() => { if (ready) db.setSetting(SETTING.prayerConfig, prayerConfig); }, [ready, prayerConfig]);
 
   // When currentTemplate changes, reload its sections & habits
   useEffect(() => {
@@ -465,6 +471,7 @@ export const App: React.FC = () => {
         onPrintPDF={handlePrintPDF}
         onEmailReport={handleEmailReport}
         onManageTemplates={() => setIsTemplatesOpen(true)}
+        onOpenPrayer={() => setIsPrayerOpen(true)}
         onOpenData={() => setIsDataOpen(true)}
       />
 
@@ -526,6 +533,8 @@ export const App: React.FC = () => {
             onRemoveHabit={handleDeleteHabit}
             showHijri={showHijri}
             hijriOffset={hijriOffset}
+            prayerConfig={prayerConfig}
+            onOpenPrayerSettings={() => setIsPrayerOpen(true)}
           />
         )}
 
@@ -586,6 +595,11 @@ export const App: React.FC = () => {
 
       {/* Backup, restore, sample data */}
       {isDataOpen && <DataSheet onClose={() => setIsDataOpen(false)} onDataChanged={loadAll} />}
+
+      {/* Prayer times (location, method) */}
+      {isPrayerOpen && (
+        <PrayerSettingsSheet config={prayerConfig} onChange={setPrayerConfig} onClose={() => setIsPrayerOpen(false)} />
+      )}
 
       {/* Templates: switch, create, duplicate, import/export, edit, delete */}
       {isTemplatesOpen && (

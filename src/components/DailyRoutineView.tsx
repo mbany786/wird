@@ -3,6 +3,8 @@ import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { getHijriDate } from '../utils/hijri';
 import { todayStr, addDays, parseLocalDate } from '../utils/date';
 import { AmountEntry } from './AmountEntry';
+import { PrayerTimesCard, templateHasPrayers } from './PrayerTimesCard';
+import { PrayerConfig } from '../utils/prayerTimes';
 import { isDoneLog, weekKeyOf } from '../utils/cadence';
 import { allowsCustomAmount } from '../utils/amount';
 import { 
@@ -34,6 +36,8 @@ interface DailyRoutineViewProps {
   onRemoveHabit?: (habitId: string) => void;
   showHijri?: boolean;
   hijriOffset?: number;
+  prayerConfig?: PrayerConfig;
+  onOpenPrayerSettings?: () => void;
 }
 
 export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
@@ -46,7 +50,9 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
   onUpdateLog,
   onRemoveHabit,
   showHijri = false,
-  hijriOffset = 0
+  hijriOffset = 0,
+  prayerConfig,
+  onOpenPrayerSettings
 }) => {
   const isSpiritualTemplate = template.id === 'daily_spiritual_schedule';
   const isCycleTemplate = template.id === 'cycle_health_tracker';
@@ -126,6 +132,22 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
+
+      {/* Prayer times with one-tap logging */}
+      {prayerConfig && templateHasPrayers(habits) && (
+        <PrayerTimesCard
+          config={prayerConfig}
+          dateStr={selectedDate}
+          habits={habits}
+          logs={logs.filter(l => l.date === selectedDate)}
+          onLogState={(habit, code) => {
+            const st = habit.multiStates?.find(s => s.code === code);
+            if (!st) return;
+            onUpdateLog(habit.id, { status: st.scoreWeight > 0 ? 'COMPLETED' : 'FAILED', stateCode: code, numericValue: st.scoreWeight, date: selectedDate });
+          }}
+          onOpenSettings={() => onOpenPrayerSettings?.()}
+        />
+      )}
 
       {/* Daily Cycle Stage Card */}
       {isCycleTemplate && cycleDailyInfo && (
