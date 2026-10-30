@@ -58,6 +58,8 @@ export interface HabitLog {
   amountUnit?: 'count' | 'min';
   notes?: string;
   timestamp: number;
+  /** true for records created by "Explore with sample data" */
+  sample?: boolean;
 }
 
 export interface TrackerTemplate {
@@ -76,4 +78,10 @@ export interface MonthlyRemark {
   templateId: string;
   monthKey: string; // YYYY-MM
   remarks: string;
+  sample?: boolean;
+}
+
+export interface AppSetting {
+  key: string;
+  value: unknown;
 }

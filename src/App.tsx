@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { db } from './db';
+import { db, SETTING } from './db';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from './types';
 import { TEMPLATES } from './data/templates';
 import { Header, VIEW_TABS } from './components/Header';
@@ -11,6 +11,8 @@ import { TemplateCustomizerModal } from './components/TemplateCustomizerModal';
 import { ActivityFilter, ALL_ACTIVITIES, filterHabits } from './components/ActivityFilter';
 import { downloadExcel, printPDF, getEmailReportUri } from './utils/exportUtils';
 import { todayStr, currentMonthStr } from './utils/date';
+import { DataSheet } from './components/DataSheet';
+import { SampleDataPrompt } from './components/SampleDataPrompt';
 
 export const App: React.FC = () => {
   const [templates, setTemplates] = useState<TrackerTemplate[]>(TEMPLATES);
@@ -38,6 +40,11 @@ export const App: React.FC = () => {
   } | null>(null);
 
   const [isCustomizerOpen, setIsCustomizerOpen] = useState<boolean>(false);
+  const [isDataOpen, setIsDataOpen] = useState<boolean>(false);
+
+  // True once stored data + settings have loaded (prevents saving defaults over stored settings)
+  const [ready, setReady] = useState<boolean>(false);
+  const [sampleDismissed, setSampleDismissed] = useState<boolean>(true);
 
   // Activity filter: show every habit, one section, or a single habit across Matrix / Daily / Analytics
   const [activityFilter, setActivityFilter] = useState<string>(ALL_ACTIVITIES);
@@ -48,36 +55,45 @@ export const App: React.FC = () => {
     [sections, visibleHabits, activityFilter]
   );
 
-  // Initialize DB and Seed Data
-  useEffect(() => {
-    const initApp = async () => {
-      await db.seedDefaultTemplates();
-      
-      // Load current template habits & sections
-      const dbTemplates = await db.templates.toArray();
-      if (dbTemplates.length > 0) {
-        setTemplates(dbTemplates);
-        const active = dbTemplates.find(t => t.id === currentTemplate.id) || dbTemplates[0];
-        setCurrentTemplate(active);
-        setSections(active.sections);
-        setHabits(active.habits);
-      }
+  // Load everything from the local database (used at launch and after restore / sample changes)
+  const loadAll = useCallback(async () => {
+    await db.ensureDefaultTemplates();
 
-      // Load logs
-      const allLogs = await db.logs.toArray();
-      setLogs(allLogs);
+    const [dbTemplates, allLogs, storedTemplateId, storedShowHijri, storedOffset, dismissed] = await Promise.all([
+      db.templates.toArray(),
+      db.logs.toArray(),
+      db.getSetting<string | null>(SETTING.currentTemplateId, null),
+      db.getSetting<boolean>(SETTING.showHijri, true),
+      db.getSetting<number>(SETTING.hijriOffset, 0),
+      db.getSetting<boolean>(SETTING.sampleDismissed, false)
+    ]);
 
-      // Load remarks for current month
-      const remarkRecord = await db.remarks
-        .where({ templateId: currentTemplate.id, monthKey: currentMonth })
-        .first();
-      if (remarkRecord) {
-        setMonthlyRemarks(remarkRecord.remarks);
-      }
-    };
+    if (dbTemplates.length > 0) {
+      // Keep built-in templates in their defined order, then the user's own
+      const order = new Map(TEMPLATES.map((t, i) => [t.id, i]));
+      dbTemplates.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
+      setTemplates(dbTemplates);
+      const active = dbTemplates.find(t => t.id === storedTemplateId) || dbTemplates[0];
+      setCurrentTemplate(active);
+      setSections(active.sections);
+      setHabits(active.habits);
+    }
 
-    initApp();
+    setLogs(allLogs);
+    setShowHijri(storedShowHijri);
+    setHijriOffset(storedOffset);
+    setSampleDismissed(dismissed);
+    setReady(true);
   }, []);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  // Remember settings between launches
+  useEffect(() => { if (ready) db.setSetting(SETTING.currentTemplateId, currentTemplate.id); }, [ready, currentTemplate.id]);
+  useEffect(() => { if (ready) db.setSetting(SETTING.showHijri, showHijri); }, [ready, showHijri]);
+  useEffect(() => { if (ready) db.setSetting(SETTING.hijriOffset, hijriOffset); }, [ready, hijriOffset]);
 
   // When currentTemplate changes, reload its sections & habits
   useEffect(() => {
@@ -94,7 +110,7 @@ export const App: React.FC = () => {
       setMonthlyRemarks(rec?.remarks || '');
     };
     loadRemarks();
-  }, [currentMonth, currentTemplate]);
+  }, [currentMonth, currentTemplate, ready, logs.length]);
 
   // Handle Android hardware back button & Escape key to close active modals before exiting
   useEffect(() => {
@@ -402,10 +418,25 @@ export const App: React.FC = () => {
         onPrintPDF={handlePrintPDF}
         onEmailReport={handleEmailReport}
         onCreateBlankTemplate={handleCreateBlankTemplate}
+        onOpenData={() => setIsDataOpen(true)}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 pt-4 md:p-6 space-y-6 pb-[calc(env(safe-area-inset-bottom)+49px+24px)] sm:pb-[max(env(safe-area-inset-bottom),24px)]">
+        {/* First-run choice: start fresh or explore with removable sample data */}
+        {ready && logs.length === 0 && !sampleDismissed && (
+          <SampleDataPrompt
+            onLoad={async () => {
+              await db.loadSampleData();
+              await loadAll();
+            }}
+            onDismiss={() => {
+              setSampleDismissed(true);
+              db.setSetting(SETTING.sampleDismissed, true);
+            }}
+          />
+        )}
+
         {/* Activity filter */}
         <div className="-mb-3">
           <ActivityFilter
@@ -502,6 +533,9 @@ export const App: React.FC = () => {
           onClose={() => setCellModalData(null)}
         />
       )}
+
+      {/* Backup, restore, sample data */}
+      {isDataOpen && <DataSheet onClose={() => setIsDataOpen(false)} onDataChanged={loadAll} />}
 
       {/* Template Customizer Modal */}
       {isCustomizerOpen && (
