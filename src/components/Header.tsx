@@ -218,7 +218,7 @@ export const Header: React.FC<HeaderProps> = ({
                       { label: 'Share as Excel', Icon: FileSpreadsheet, fn: onExportExcel },
                       { label: 'Share monthly chart (PDF)', Icon: Printer, fn: onPrintPDF },
                       { label: 'Email monthly report', Icon: Mail, fn: onEmailReport },
-                      { label: 'Prayer times…', Icon: Clock, fn: onOpenPrayer },
+                      { label: 'Prayer times & reminders…', Icon: Clock, fn: onOpenPrayer },
                       { label: 'Backup & data…', Icon: DatabaseBackup, fn: onOpenData }
                     ].map(({ label, Icon, fn }) => (
                       <button

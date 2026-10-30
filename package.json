@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "ui:snap": "bun run build && node scripts/ui-snapshots.mjs",
+    "test:unit": "bun test tests/unit",
     "test:e2e": "bun run build && for f in tests/e2e/*.spec.mjs; do node \"$f\" || exit 1; done",
     "preview": "vite preview",
     "cap:sync": "cap sync",

@@ -12,6 +12,8 @@ import { TemplatesSheet } from './components/TemplatesSheet';
 import { newId } from './utils/templateOps';
 import { DEFAULT_PRAYER_CONFIG, PrayerConfig } from './utils/prayerTimes';
 import { PrayerSettingsSheet } from './components/PrayerSettingsSheet';
+import { ReminderSettings } from './components/ReminderSettings';
+import { applyReminderPlan, buildReminderPlan, DEFAULT_REMINDERS, ReminderConfig } from './utils/reminders';
 import { ActivityFilter, ALL_ACTIVITIES, filterHabits } from './components/ActivityFilter';
 import { downloadExcel, getEmailReportUri } from './utils/exportUtils';
 import { shareFile } from './utils/share';
@@ -54,6 +56,7 @@ export const App: React.FC = () => {
   const [isTemplatesOpen, setIsTemplatesOpen] = useState<boolean>(false);
   const [isPrayerOpen, setIsPrayerOpen] = useState<boolean>(false);
   const [prayerConfig, setPrayerConfig] = useState<PrayerConfig>(DEFAULT_PRAYER_CONFIG);
+  const [reminderConfig, setReminderConfig] = useState<ReminderConfig>(DEFAULT_REMINDERS);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const showToast = useCallback((t: Omit<ToastMessage, 'id'>) => setToast({ ...t, id: Date.now() }), []);
   const dismissToast = useCallback(() => setToast(null), []);
@@ -84,6 +87,7 @@ export const App: React.FC = () => {
       db.getSetting<boolean>(SETTING.sampleDismissed, false)
     ]);
     setPrayerConfig({ ...DEFAULT_PRAYER_CONFIG, ...(await db.getSetting<PrayerConfig | null>(SETTING.prayerConfig, null)) });
+    setReminderConfig({ ...DEFAULT_REMINDERS, ...(await db.getSetting<ReminderConfig | null>(SETTING.reminders, null)) });
 
     if (dbTemplates.length > 0) {
       // Keep built-in templates in their defined order, then the user's own
@@ -112,6 +116,17 @@ export const App: React.FC = () => {
   useEffect(() => { if (ready) db.setSetting(SETTING.showHijri, showHijri); }, [ready, showHijri]);
   useEffect(() => { if (ready) db.setSetting(SETTING.hijriOffset, hijriOffset); }, [ready, hijriOffset]);
   useEffect(() => { if (ready) db.setSetting(SETTING.prayerConfig, prayerConfig); }, [ready, prayerConfig]);
+  useEffect(() => { if (ready) db.setSetting(SETTING.reminders, reminderConfig); }, [ready, reminderConfig]);
+
+  // Keep a week of reminders scheduled: after changes and whenever the app comes back to the foreground
+  useEffect(() => {
+    if (!ready) return;
+    const reschedule = () => applyReminderPlan(buildReminderPlan(reminderConfig, prayerConfig, hijriOffset));
+    const t = setTimeout(reschedule, 400);
+    const onVisible = () => { if (document.visibilityState === 'visible') reschedule(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearTimeout(t); document.removeEventListener('visibilitychange', onVisible); };
+  }, [ready, reminderConfig, prayerConfig, hijriOffset]);
 
   // When currentTemplate changes, reload its sections & habits
   useEffect(() => {
@@ -598,7 +613,9 @@ export const App: React.FC = () => {
 
       {/* Prayer times (location, method) */}
       {isPrayerOpen && (
-        <PrayerSettingsSheet config={prayerConfig} onChange={setPrayerConfig} onClose={() => setIsPrayerOpen(false)} />
+        <PrayerSettingsSheet config={prayerConfig} onChange={setPrayerConfig} onClose={() => setIsPrayerOpen(false)}>
+          <ReminderSettings config={reminderConfig} prayerConfig={prayerConfig} hijriOffset={hijriOffset} onChange={setReminderConfig} />
+        </PrayerSettingsSheet>
       )}
 
       {/* Templates: switch, create, duplicate, import/export, edit, delete */}

@@ -73,7 +73,7 @@ export const PrayerSettingsSheet: React.FC<PrayerSettingsSheetProps> = ({ config
     onChange({ ...config, adjustments: { ...config.adjustments, [k]: Math.max(-30, Math.min(30, (config.adjustments[k] ?? 0) + delta)) } });
 
   return (
-    <Sheet title="Prayer times" subtitle="Calculated on this device. Nothing is sent anywhere." onClose={onClose}>
+    <Sheet title="Prayer times & reminders" subtitle="Calculated on this device. Nothing is sent anywhere." onClose={onClose}>
       <SheetSection title="Location">
         <div className="flex items-center gap-2 mb-3 text-[15px]">
           <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />

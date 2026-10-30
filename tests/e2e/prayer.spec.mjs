@@ -52,7 +52,7 @@ await withApp('Prayer times: use my location picks regional conventions', async 
   const p = await open(ctx);
   await startFresh(p);
   await openMenu(p);
-  await p.getByRole('button', { name: 'Prayer times…' }).click(); await p.waitForTimeout(200);
+  await p.getByRole('button', { name: 'Prayer times & reminders…' }).click(); await p.waitForTimeout(200);
   await sheet(p).getByRole('button', { name: 'Use my location' }).click(); await p.waitForTimeout(1200);
   ok(await sheet(p).getByText('My location', { exact: true }).isVisible(), 'device location used');
   ok(await sheet(p).getByLabel('Method').inputValue() === 'Karachi', 'Karachi method suggested for Pakistan');
@@ -64,7 +64,7 @@ await withApp('Prayer times: denied location gives a clear way forward', async (
   const p = await open(ctx);
   await startFresh(p);
   await openMenu(p);
-  await p.getByRole('button', { name: 'Prayer times…' }).click(); await p.waitForTimeout(200);
+  await p.getByRole('button', { name: 'Prayer times & reminders…' }).click(); await p.waitForTimeout(200);
   await sheet(p).getByRole('button', { name: 'Use my location' }).click(); await p.waitForTimeout(2500);
   ok(await sheet(p).getByRole('alert').isVisible(), `explains what to do (${(await sheet(p).getByRole('alert').innerText()).slice(0, 60)}…)`);
 });
