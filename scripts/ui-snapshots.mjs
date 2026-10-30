@@ -51,28 +51,7 @@ try {
     // Tabs live in the bottom bar on iPhone and in the header on iPad/desktop
     const tab = (label) => page.getByRole('button', { name: label, exact: true }).first();
 
-    await shot('01-matrix.png');
-    await page.locator('td.sticky span.text-\\[15px\\]').first().click();
-    await page.waitForTimeout(400);
-    await shot('02-quick-count.png');
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
-
-    await tab('Daily').click();
-    await page.waitForTimeout(400);
-    await shot('03-daily.png');
-
-    await tab('Analytics').click();
-    await page.waitForTimeout(400);
-    await shot('04-analytics.png');
-
-    await page.getByRole('button', { name: 'More options' }).click();
-    await page.waitForTimeout(200);
-    await shot('05-more-menu.png');
-
-    // Smallest rendered font size on the matrix — guards the 11pt minimum
-    await page.getByRole('button', { name: 'More options' }).click();
-    await tab('Matrix').click();
-    const minFont = await page.evaluate(() => {
+    const minFontNow = () => page.evaluate(() => {
       let min = Infinity;
       for (const el of document.querySelectorAll('body *')) {
         if (!el.childNodes.length || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
@@ -82,6 +61,40 @@ try {
       }
       return min;
     });
+    let minFont = Infinity;
+    const sample = page.getByRole('button', { name: 'Explore with sample data' });
+    if (await sample.count()) { await sample.click(); await page.waitForTimeout(2500); }
+
+    await shot('01-today.png');
+    minFont = Math.min(minFont, await minFontNow());
+
+    await tab('Matrix').click();
+    await page.waitForTimeout(400);
+    await shot('02-matrix.png');
+    minFont = Math.min(minFont, await minFontNow());
+    await page.locator('td.sticky span.text-\\[15px\\]').first().click();
+    await page.waitForTimeout(400);
+    await shot('03-quick-count.png');
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+
+    await tab('Analytics').click();
+    await page.waitForTimeout(1200);
+    await shot('04-analytics.png');
+    minFont = Math.min(minFont, await minFontNow());
+
+    await page.getByRole('button', { name: 'More options' }).click();
+    await page.waitForTimeout(200);
+    await shot('05-more-menu.png');
+    await page.getByRole('button', { name: 'Settings…' }).click();
+    await page.waitForTimeout(300);
+    await shot('06-settings.png');
+    minFont = Math.min(minFont, await minFontNow());
+    await page.getByRole('button', { name: 'Tasbih counter' }).click();
+    await page.waitForTimeout(300);
+    for (let i = 0; i < 12; i++) await page.getByRole('button', { name: 'Count' }).click();
+    await shot('07-tasbih.png');
+    await page.getByRole('button', { name: 'Close tasbih' }).click();
+
     if (minFont < 11) problems.push(`[${name}] text smaller than 11px found (${minFont}px)`);
 
     await ctx.close();
