@@ -4,8 +4,44 @@
 
 :root {
   font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "Geeza Pro", "Damascus", "Al Nile", "Noto Naskh Arabic", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  color-scheme: light dark;
+  color-scheme: dark;
+
+  /* Dark theme (default). Blue-grey tinted grey ramp (hue ~222°), WCAG-checked:
+     100 vs 900 = 12.4:1, 400 vs 900 = 4.9:1 (passes AA body text), 500 vs 900 = 3.5:1 (passes AA large text). */
+  --slate-950: 17 19 22;   /* #111316 app background */
+  --slate-900: 26 29 34;   /* #1a1d22 card / surface */
+  --slate-800: 36 40 48;   /* #242830 nested surface, borders */
+  --slate-700: 47 52 62;   /* #2f343e input borders */
+  --slate-600: 63 69 84;   /* #3f4554 */
+  --slate-500: 109 114 123; /* #6d727b tertiary text */
+  --slate-400: 134 139 148; /* #868b94 secondary text */
+  --slate-300: 166 169 177; /* #a6a9b1 */
+  --slate-200: 189 191 197; /* #bdbfc5 */
+  --slate-100: 220 221 224; /* #dcdde0 primary text */
+  --slate-50: 244 245 246;  /* #f4f5f6 */
 }
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Light theme: same elevation logic (card lighter than page), dark text on light surfaces. */
+  --slate-950: 241 243 245; /* #f1f3f5 app background */
+  --slate-900: 255 255 255; /* #ffffff card / surface */
+  --slate-800: 231 233 236; /* #e7e9ec nested surface, borders */
+  --slate-700: 215 218 222; /* #d7dade input borders */
+  --slate-600: 185 190 196; /* #b9bec4 */
+  --slate-500: 107 114 128; /* #6b7280 tertiary text, ~4.6:1 on white */
+  --slate-400: 75 85 99;    /* #4b5563 secondary text, ~7.5:1 on white */
+  --slate-300: 55 65 81;    /* #374151 */
+  --slate-200: 39 48 63;    /* #27303f */
+  --slate-100: 17 21 28;    /* #11151c primary text */
+  --slate-50: 5 7 10;       /* #05070a */
+}
+
+/* "System" theme is resolved in JS (App.tsx, Task #16 appearance setting), which sets
+   data-theme="dark"/"light" on <html> directly from matchMedia — kept explicit rather than
+   relying on a prefers-color-scheme query here, so the default stays dark regardless of the
+   host OS until the user actually opts into following the system. */
 
 /* Ensure Arabic, Urdu and RTL text is immune to uppercase transformation and letter-spacing breakage */
 :lang(ur), :lang(ar), [dir="rtl"], .font-arabic {
@@ -27,8 +63,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #0f172a;
-  color: #f8fafc;
+  background-color: rgb(var(--slate-950));
+  color: rgb(var(--slate-100));
 }
 
 /* Custom scrollbars for high-density matrix */
@@ -37,14 +73,14 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgb(var(--slate-950) / 0.6);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.4);
+  background: rgb(var(--slate-600) / 0.6);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.7);
+  background: rgb(var(--slate-400) / 0.8);
 }
 
 /* Print to PDF Styling */
