@@ -1,7 +1,7 @@
 import { withApp, ok, summary, tab, openSettings, logCount } from './harness.mjs';
 
 const startFresh = async (p) => { const b = p.getByRole('button', { name: 'Start fresh' }); if (await b.count()) await b.click(); };
-const card = (p, t) => p.locator('div.rounded-xl.border').filter({ has: p.locator(`span.text-sm.font-bold:text-is("${t}")`) }).first();
+const card = (p, t) => p.locator('[id^="habit-"]').filter({ has: p.locator(`span.font-medium:text-is("${t}")`) }).first();
 
 await withApp('Today home: opens on Today with progress and what is left', async ({ ctx, open }) => {
   const p = await open(ctx);

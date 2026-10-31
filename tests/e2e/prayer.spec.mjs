@@ -38,7 +38,7 @@ await withApp('Prayer times: city, method, Asr, logging, persistence', async ({ 
   ok(await p.getByTestId('time-isha').innerText() === exp.isha, 'Daily card shows the times');
   await p.getByRole('button', { name: 'Log Fajr' }).click();
   await p.locator('section[aria-label="Prayer times"]').getByRole('button', { name: /Jamat/ }).click(); await p.waitForTimeout(300);
-  const fajrCard = p.locator('div.rounded-xl.border').filter({ has: p.locator('span.text-sm.font-bold:text-is("Fajr")') }).first();
+  const fajrCard = p.locator('[id^="habit-"]').filter({ has: p.locator('span.font-medium:text-is("Fajr")') }).first();
   ok((await fajrCard.locator('button.ring-1').innerText()).includes('Jamat'), 'logging from the time card updates Fajr');
   ok(await p.getByRole('button', { name: /Fajr: With Jamat\. Change/ }).isVisible(), 'time card shows the logged state');
 

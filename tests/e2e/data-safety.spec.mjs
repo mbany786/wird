@@ -57,7 +57,7 @@ await withApp('Sample data: opt-in, never overwrites, removable', async ({ ctx, 
   const page = await open(ctx);
   // a real entry first: mark Fajr today as Jamat on Daily
   await tab(page, 'Today').click(); await page.waitForTimeout(300);
-  const fajr = page.locator('div.rounded-xl.border').filter({ has: page.locator('span.text-sm.font-bold:text-is("Fajr")') }).first();
+  const fajr = page.locator('[id^="habit-"]').filter({ has: page.locator('span.font-medium:text-is("Fajr")') }).first();
   await fajr.getByRole('button', { name: /Jamat/ }).click(); await page.waitForTimeout(300);
   ok(await logCount(page) === 1, 'one real entry logged');
   await openData(page);

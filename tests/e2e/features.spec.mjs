@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { withApp, ok, summary, tab, matrixRows, openMenu } from './harness.mjs';
 
 const studio = async (page) => { await page.getByRole('button', { name: 'Open Template Studio' }).click(); await page.waitForTimeout(300); };
-const dailyCard = (page, t) => page.locator('div.rounded-xl.border').filter({ has: page.locator(`span.text-sm.font-bold:text-is("${t}")`) }).first();
+const dailyCard = (page, t) => page.locator('[id^="habit-"]').filter({ has: page.locator(`span.font-medium:text-is("${t}")`) }).first();
 const startFresh = async (page) => { const b = page.getByRole('button', { name: 'Start fresh' }); if (await b.count()) await b.click(); };
 
 await withApp('Exports go through share/download and produce real files', async ({ ctx, open }) => {
