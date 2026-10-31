@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Habit, HabitLog, TrackerTemplate } from '../types';
 import { calculateMonthSummary, computeHabitCorrelation } from '../utils/analytics';
 import { 
@@ -109,6 +109,10 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
 
     return { totalPages, totalCount, totalMinutes, totalWaterMl, totalSteps, totalBooks, totalMilkOz, totalSleepHours, cleanAbstinenceLogs };
   }, [logs, habits]);
+
+  // Habit strength, weakest first: the habits that most need attention lead the list.
+  const [showAllStrength, setShowAllStrength] = useState(false);
+  const sortedByWeakest = useMemo(() => [...summaries].sort((a, b) => a.summary.strengthScore - b.summary.strengthScore), [summaries]);
 
   // Top Streaks
   const topStreaks = useMemo(() => {
@@ -307,49 +311,59 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
               </span>
             </div>
             <p className="text-[13px] text-slate-400 mt-1">
-              Builds with consistency and fades slowly (21-day half-life), so one missed day won't reset your progress.
+              Weakest first — these need attention most. Builds with consistency and fades
+              slowly (21-day half-life), so one missed day won't reset your progress.
             </p>
           </div>
 
-          <div className="space-y-3">
-            {summaries.map(({ habit, summary }) => (
-              <div key={habit.id} className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-200">{habit.title}</span>
+          <div className="divide-y divide-slate-800/70">
+            {(showAllStrength ? sortedByWeakest : sortedByWeakest.slice(0, 5)).map(({ habit, summary }) => (
+              <div key={habit.id} className="py-2.5 first:pt-0">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[14px] font-medium text-slate-200 truncate">{habit.title}</span>
+                      {habit.unit && (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 tabular-nums shrink-0">
+                          {habit.unit}
+                        </span>
+                      )}
+                    </div>
                     {isSpiritualTemplate && habit.urduTitle && (
-                      <span className="text-[11px] text-emerald-400" dir="rtl">{habit.urduTitle}</span>
-                    )}
-                    {habit.unit && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 tabular-nums">
-                        {habit.unit}
-                      </span>
+                      <span className="block text-[12px] text-slate-500 font-arabic mt-0.5" dir="rtl">{habit.urduTitle}</span>
                     )}
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className="text-slate-400 text-[11px]">
-                      {summary.totalLoggedDays} logs
-                    </span>
-                    <span className="tabular-nums font-bold text-emerald-400 text-sm">
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-slate-500 text-[11px] tabular-nums">{summary.totalLoggedDays} logs</span>
+                    <span className="tabular-nums font-medium text-slate-100 text-[14px] w-10 text-right">
                       {summary.strengthScore}%
                     </span>
                   </div>
                 </div>
 
                 {/* Strength Bar */}
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden flex">
-                  <div 
+                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden flex mt-1.5">
+                  <div
                     className="h-full rounded-full transition-all duration-500"
-                    style={{ 
+                    style={{
                       width: `${summary.strengthScore}%`,
-                      backgroundColor: summary.strengthScore > 75 ? '#22c55e' : summary.strengthScore > 40 ? '#38bdf8' : '#fbbf24'
+                      backgroundColor: summary.strengthScore > 75 ? '#21a87b' : summary.strengthScore > 40 ? '#249dd3' : '#de9822'
                     }}
                   />
                 </div>
               </div>
             ))}
           </div>
+
+          {sortedByWeakest.length > 5 && (
+            <button
+              type="button"
+              onClick={() => setShowAllStrength(v => !v)}
+              className="w-full h-9 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+            >
+              {showAllStrength ? 'Show top 5' : `Show all ${sortedByWeakest.length}`}
+            </button>
+          )}
         </div>
 
         {/* Side Panel: Top Streaks & Catalyst Correlations */}
@@ -367,7 +381,7 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
                   <span className="text-slate-200 font-medium truncate max-w-[170px]">
                     {habit.title}
                   </span>
-                  <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                  <div className="flex items-center gap-1.5 font-semibold text-amber-400">
                     <Flame className="w-3.5 h-3.5 fill-amber-400" />
                     <span>{summary.currentStreak} days</span>
                   </div>
@@ -397,7 +411,7 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-slate-400">
                       <span>Pearson Correlation (r):</span>
-                      <span className={`tabular-nums font-bold ${c.score > 0.5 ? 'text-emerald-400' : 'text-sky-400'}`}>
+                      <span className={`tabular-nums font-semibold ${c.score > 0.5 ? 'text-emerald-400' : 'text-sky-400'}`}>
                         +{c.score} (Strong Catalyst)
                       </span>
                     </div>
