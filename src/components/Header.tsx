@@ -155,7 +155,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenCustomizer}
-              className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition"
+              className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-300 hover:text-slate-100 hover:bg-slate-800 transition"
               title="Template Studio: edit sections and tasks"
               aria-label="Open Template Studio"
             >
@@ -167,7 +167,7 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={() => setMenuOpen(o => !o)}
                 className={`relative z-50 w-10 h-10 flex items-center justify-center rounded-xl transition ${
-                  menuOpen ? 'bg-slate-800 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                  menuOpen ? 'bg-slate-800 text-slate-100' : 'text-slate-300 hover:text-slate-100 hover:bg-slate-800'
                 }`}
                 title="Share, Tasbih and Settings"
                 aria-label="More options"

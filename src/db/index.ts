@@ -13,7 +13,9 @@ export const SETTING = {
   sampleDismissed: 'sample.promptDismissed',
   prayerConfig: 'prayer.config',
   reminders: 'reminders.config',
-  weekStart: 'week.start'
+  weekStart: 'week.start',
+  theme: 'appearance.theme',
+  textScale: 'appearance.textScale'
 } as const;
 
 export class HabitTrackerDatabase extends Dexie {

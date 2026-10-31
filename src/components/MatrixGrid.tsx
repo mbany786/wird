@@ -545,7 +545,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-white">Custom Tracker Canvas</h3>
+                <h3 className="text-sm font-semibold text-slate-100">Custom Tracker Canvas</h3>
                 <span className="text-[11px] bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded-full tabular-nums border border-emerald-700">
                   Fully Editable
                 </span>
@@ -588,7 +588,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                     </span>
                   )}
                 </div>
-                <h2 className="text-base sm:text-lg font-semibold text-white tracking-tight mt-0.5">
+                <h2 className="text-base sm:text-lg font-semibold text-slate-100 tracking-tight mt-0.5">
                   Cycle Day {cycleAnalysis.currentCycleDay} of {cycleAnalysis.totalCycleLength} • <span className={cycleAnalysis.phaseInfo.textClass}>{cycleAnalysis.phaseInfo.subPhase}</span>
                 </h2>
               </div>
@@ -638,7 +638,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
 
             <div className="flex items-center justify-between text-[11px] text-slate-500 tabular-nums px-1">
               <span>Day 1</span>
-              <span className="text-white font-semibold bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700">
+              <span className="text-slate-100 font-semibold bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700">
                 Today is Cycle Day {cycleAnalysis.currentCycleDay}
               </span>
               <span>Day {cycleLength}</span>
@@ -1257,7 +1257,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-5 shadow-2xl relative text-slate-100">
             <button
               onClick={() => setTaskToDelete(null)}
-              className="absolute top-3.5 right-3.5 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              className="absolute top-3.5 right-3.5 p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1267,13 +1267,13 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-white">Remove Task?</h3>
+                <h3 className="text-base font-semibold text-slate-100">Remove Task?</h3>
                 <p className="text-xs text-slate-400">Manage habit tracker list</p>
               </div>
             </div>
 
             <p className="text-xs text-slate-300 mb-4 bg-slate-950 p-3 rounded-xl border border-slate-800">
-              Are you sure you want to remove <span className="font-semibold text-white">"{taskToDelete.title}"</span> from this tracker?
+              Are you sure you want to remove <span className="font-semibold text-slate-100">"{taskToDelete.title}"</span> from this tracker?
             </p>
 
             <div className="flex gap-2">
@@ -1762,7 +1762,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
           <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
             <div className="min-w-0">
               <div className="flex items-baseline gap-2 min-w-0">
-                <span className="font-semibold text-white text-[17px] truncate">
+                <span className="font-semibold text-slate-100 text-[17px] truncate">
                   {selectedCell.habit.title}
                 </span>
                 {isSpiritualTemplate && selectedCell.habit.urduTitle && (
@@ -1792,7 +1792,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
               {onEditHabit && (
                 <button
                   onClick={() => onEditHabit(selectedCell.habit)}
-                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-100 transition"
                   aria-label="Edit habit"
                   title="Edit habit"
                 >
@@ -1801,7 +1801,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
               )}
               <button
                 onClick={() => onCellClick(selectedCell.habit, selectedCell.date, selectedCell.day)}
-                className="flex items-center justify-center gap-1 min-w-[40px] h-10 px-2 sm:px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[13px] font-semibold transition"
+                className="flex items-center justify-center gap-1 min-w-[40px] h-10 px-2 sm:px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-100 text-[13px] font-semibold transition"
                 title="Open full modal for notes and stopwatch"
                 aria-label="Details and notes"
               >
@@ -1810,7 +1810,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
               </button>
               <button
                 onClick={() => setSelectedCell(null)}
-                className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition"
                 title="Close"
                 aria-label="Close"
               >
@@ -2067,7 +2067,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       </button>
                       <button
                         onClick={() => handleQuickUpdate({ unitUsed: 'min', status: 'FAILED', numericValue: 0 })}
-                        className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs"
+                        className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-100 text-xs"
                       >
                         0
                       </button>
@@ -2136,7 +2136,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                       </button>
                       <button
                         onClick={() => handleQuickUpdate({ unitUsed: 'count', status: 'FAILED', numericValue: 0 })}
-                        className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs"
+                        className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-100 text-xs"
                       >
                         0
                       </button>
@@ -2226,7 +2226,7 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                 </button>
                 <button
                   onClick={() => handleQuickUpdate({ status: 'FAILED', numericValue: 0 })}
-                  className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs"
+                  className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-100 text-xs"
                 >
                   Clear (0)
                 </button>

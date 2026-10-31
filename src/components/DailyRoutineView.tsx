@@ -106,7 +106,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
         </button>
 
         <div className="text-center min-w-0 flex-1">
-          <h2 className="text-[17px] font-semibold text-white">
+          <h2 className="text-[17px] font-semibold text-slate-100">
             {parseLocalDate(selectedDate).toLocaleDateString(undefined, {
               weekday: 'short',
               month: 'short',
@@ -208,7 +208,7 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
                     </span>
                   )}
                 </div>
-                <h3 className="text-sm font-bold text-white mt-0.5">
+                <h3 className="text-sm font-bold text-slate-100 mt-0.5">
                   Cycle Day {cycleDailyInfo.currentCycleDay} of {cycleDailyInfo.totalCycleLength} • {cycleDailyInfo.phaseInfo.subPhase}
                 </h3>
               </div>

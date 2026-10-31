@@ -143,7 +143,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition"
         >
           <X className="w-5 h-5" />
         </button>
@@ -155,7 +155,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
             <span>•</span>
             <span>{date}</span>
           </div>
-          <h2 className="text-xl font-bold text-white mt-1">{habit.title}</h2>
+          <h2 className="text-xl font-bold text-slate-100 mt-1">{habit.title}</h2>
           {habit.urduTitle && (
             <p className="text-sm text-emerald-300 font-medium" dir="rtl">{habit.urduTitle}</p>
           )}
@@ -192,7 +192,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                     ✓
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-white group-hover:text-emerald-200">
+                    <div className="text-sm font-bold text-slate-100 group-hover:text-emerald-200">
                       Mark Clean Day (0 Incidents)
                     </div>
                     <div className="text-[11px] text-emerald-400/90">
@@ -429,7 +429,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                   min="0"
                   value={numericVal}
                   onChange={(e) => setNumericVal(Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-center font-bold text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-center font-bold text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   placeholder="Custom quantity"
                 />
               </div>
@@ -628,7 +628,7 @@ export const CellEditorModal: React.FC<CellEditorModalProps> = ({
                     setIsTimerRunning(false);
                     setTimerSeconds(0);
                   }}
-                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-white transition"
+                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-100 transition"
                   title="Reset"
                 >
                   <RotateCcw className="w-4 h-4" />

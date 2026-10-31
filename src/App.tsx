@@ -48,6 +48,8 @@ export const App: React.FC = () => {
   const [showHijri, setShowHijri] = useState<boolean>(true);
   const [hijriOffset, setHijriOffset] = useState<number>(0);
   const [weekStart, setWeekStartState] = useState<number>(1);
+  const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark');
+  const [textScale, setTextScale] = useState<number>(1);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [lastBackup, setLastBackup] = useState<string | null>(null);
@@ -107,6 +109,8 @@ export const App: React.FC = () => {
     const ws = await db.getSetting<number>(SETTING.weekStart, 1);
     setWeekStart(ws);
     setWeekStartState(ws);
+    setTheme(await db.getSetting<'dark' | 'light' | 'system'>(SETTING.theme, 'dark'));
+    setTextScale(await db.getSetting<number>(SETTING.textScale, 1));
 
     if (dbTemplates.length > 0) {
       // Keep built-in templates in their defined order, then the user's own
@@ -137,6 +141,27 @@ export const App: React.FC = () => {
   useEffect(() => { if (ready) db.setSetting(SETTING.weekStart, weekStart); }, [ready, weekStart]);
   useEffect(() => { if (ready) db.setSetting(SETTING.prayerConfig, prayerConfig); }, [ready, prayerConfig]);
   useEffect(() => { if (ready) db.setSetting(SETTING.reminders, reminderConfig); }, [ready, reminderConfig]);
+  useEffect(() => { if (ready) db.setSetting(SETTING.theme, theme); }, [ready, theme]);
+  useEffect(() => { if (ready) db.setSetting(SETTING.textScale, textScale); }, [ready, textScale]);
+
+  // Appearance: resolve "system" against the host OS live, and apply both settings to the DOM.
+  // data-theme drives the CSS-variable palette (index.css); zoom scales every px/rem size
+  // uniformly, since most of the app's type scale is literal px rather than rem.
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-color-scheme: light)');
+    const apply = () => {
+      const resolved = theme === 'system' ? (mql.matches ? 'light' : 'dark') : theme;
+      document.documentElement.dataset.theme = resolved;
+    };
+    apply();
+    if (theme === 'system') {
+      mql.addEventListener('change', apply);
+      return () => mql.removeEventListener('change', apply);
+    }
+  }, [theme]);
+  useEffect(() => {
+    (document.body.style as unknown as { zoom: string }).zoom = textScale === 1 ? '' : String(textScale);
+  }, [textScale]);
 
   // Keep a week of reminders scheduled: after changes and whenever the app comes back to the foreground
   useEffect(() => {
@@ -723,6 +748,10 @@ export const App: React.FC = () => {
           onOpenTemplates={() => setIsTemplatesOpen(true)}
           onOpenData={() => setIsDataOpen(true)}
           onOpenTasbih={() => { setIsSettingsOpen(false); setTasbih({ date: todayStr() }); }}
+          theme={theme}
+          onThemeChange={setTheme}
+          textScale={textScale}
+          onTextScaleChange={setTextScale}
           onClose={() => setIsSettingsOpen(false)}
         />
       )}

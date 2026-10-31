@@ -43,13 +43,13 @@ export const Sheet: React.FC<SheetProps> = ({ title, subtitle, onClose, children
       >
         <div className="flex items-start justify-between gap-3 px-4 sm:px-5 pt-4 pb-3 border-b border-slate-800">
           <div className="min-w-0">
-            <h2 className="text-[20px] font-semibold text-white">{title}</h2>
+            <h2 className="text-[20px] font-semibold text-slate-100">{title}</h2>
             {subtitle && <p className="text-[13px] text-slate-400 mt-0.5">{subtitle}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-10 h-10 -mr-2 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 shrink-0"
+            className="w-10 h-10 -mr-2 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 shrink-0"
             aria-label="Close"
           >
             <X className="w-5 h-5" />

@@ -154,7 +154,7 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
             <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-3xl font-extrabold text-white">{overallHealthIndex}%</span>
+            <span className="text-3xl font-extrabold text-slate-100">{overallHealthIndex}%</span>
             <span className="text-xs text-emerald-400 font-semibold flex items-center">
               <ArrowUpRight className="w-3 h-3" /> Active
             </span>

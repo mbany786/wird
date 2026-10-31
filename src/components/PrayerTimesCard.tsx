@@ -49,7 +49,7 @@ export const PrayerTimesCard: React.FC<PrayerTimesCardProps> = ({ config, dateSt
       <div className="flex items-center gap-2 mb-1 px-1">
         <MapPin className="w-4 h-4 text-emerald-400" />
         <span className="text-[13px] text-slate-400 truncate flex-1">{config.location.name}</span>
-        <button type="button" onClick={onOpenSettings} className="w-10 h-10 -my-1 -mr-1 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800" aria-label="Prayer time settings">
+        <button type="button" onClick={onOpenSettings} className="w-10 h-10 -my-1 -mr-1 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800" aria-label="Prayer time settings">
           <Settings2 className="w-4 h-4" />
         </button>
       </div>

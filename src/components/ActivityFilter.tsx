@@ -88,7 +88,7 @@ export const ActivityFilter: React.FC<ActivityFilterProps> = ({ habits, sections
         <button
           type="button"
           onClick={() => onChange(ALL_ACTIVITIES)}
-          className="h-11 px-3 rounded-xl bg-slate-900 border border-slate-800 text-[13px] font-semibold text-slate-300 hover:text-white flex items-center gap-1 shrink-0"
+          className="h-11 px-3 rounded-xl bg-slate-900 border border-slate-800 text-[13px] font-semibold text-slate-300 hover:text-slate-100 flex items-center gap-1 shrink-0"
           aria-label="Show all activities"
         >
           <X className="w-4 h-4" />

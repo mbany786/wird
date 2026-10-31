@@ -30,7 +30,7 @@ export function describeHabit(h: Habit): string {
   return kind + cadence;
 }
 
-const iconBtn = 'w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-25';
+const iconBtn = 'w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 disabled:opacity-25';
 
 const SectionHeader: React.FC<{
   section: HabitSection;
