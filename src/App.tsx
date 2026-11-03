@@ -604,7 +604,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 pt-4 md:p-6 space-y-6 pb-[calc(env(safe-area-inset-bottom)+49px+24px)] sm:pb-[max(env(safe-area-inset-bottom),24px)]">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 pt-2.5 md:p-6 space-y-6 pb-[calc(env(safe-area-inset-bottom)+49px+24px)] sm:pb-[max(env(safe-area-inset-bottom),24px)]">
         {/* First-run choice: start fresh or explore with removable sample data */}
         {ready && logs.length === 0 && !sampleDismissed && (
           <SampleDataPrompt

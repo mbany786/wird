@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Habit, HabitLog, HabitSection } from '../types';
 import { isDoneLog, weekKeyOf } from '../utils/cadence';
 import { parseLocalDate } from '../utils/date';
@@ -35,11 +36,11 @@ export function dayProgress(habits: Habit[], sections: HabitSection[], logs: Hab
 
 export const TodaySummary: React.FC<TodaySummaryProps> = ({ habits, sections, logs, date, isToday }) => {
   const { done, left, total } = useMemo(() => dayProgress(habits, sections, logs, date), [habits, sections, logs, date]);
+  const [expanded, setExpanded] = useState(false);
   if (!total) return null;
   const pct = done.length / total;
   const R = 22, C = 2 * Math.PI * R;
   const allDone = left.length === 0;
-  const shown = left.slice(0, 6);
 
   const jump = (id: string) => {
     const el = document.getElementById(`habit-${id}`);
@@ -65,22 +66,33 @@ export const TodaySummary: React.FC<TodaySummaryProps> = ({ habits, sections, lo
         </p>
         {!allDone && (
           <>
-            <p className="text-[13px] text-slate-400 mt-0.5">{isToday ? 'Still to do today' : 'Not logged'}</p>
-            <div className="flex flex-wrap gap-1.5 mt-2" aria-label="Still to do">
-              {shown.map(h => (
-                <button
-                  key={h.id}
-                  type="button"
-                  onClick={() => jump(h.id)}
-                  className="h-8 px-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[13px] text-slate-200 hover:border-slate-600 max-w-[11rem] truncate"
-                >
-                  {shortTitle(h.title)}
-                </button>
-              ))}
-              {left.length > shown.length && (
-                <span className="h-8 px-2 flex items-center text-[13px] text-slate-500">+{left.length - shown.length} more</span>
-              )}
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <p className="text-[13px] text-slate-400">{isToday ? 'Still to do today' : 'Not logged'}</p>
+              <button
+                type="button"
+                onClick={() => setExpanded(e => !e)}
+                className="flex items-center gap-0.5 text-[12px] font-medium text-slate-500 hover:text-slate-300 shrink-0 -mr-1 px-1 py-0.5"
+                aria-expanded={expanded}
+                aria-controls="still-to-do-list"
+              >
+                {expanded ? 'Hide' : `Show (${left.length})`}
+                {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
             </div>
+            {expanded && (
+              <div id="still-to-do-list" className="flex flex-wrap gap-1.5 mt-2" aria-label="Still to do">
+                {left.map(h => (
+                  <button
+                    key={h.id}
+                    type="button"
+                    onClick={() => jump(h.id)}
+                    className="h-8 px-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[13px] text-slate-200 hover:border-slate-600 max-w-[11rem] truncate"
+                  >
+                    {shortTitle(h.title)}
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>

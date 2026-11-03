@@ -13,9 +13,11 @@ await withApp('Today home: opens on Today with progress and what is left', async
   const total = Number(m[1]);
   await card(p, 'Fajr').getByRole('button', { name: /Jamat/ }).click(); await p.waitForTimeout(300);
   ok(await p.getByTestId('today-count').innerText() === `1 of ${total} done`, 'logging updates progress');
+  ok(!(await p.getByLabel('Still to do').count()), 'what is left starts collapsed');
+  await p.getByRole('button', { name: /^Show \(/ }).click(); await p.waitForTimeout(200);
   const chips = await p.getByLabel('Still to do').getByRole('button').allInnerTexts();
-  ok(!chips.includes('Fajr') && chips[0] === 'Zuhar', `what's left starts with the next item (${chips.slice(0, 3).join(', ')})`);
-  await p.getByLabel('Still to do').getByRole('button', { name: 'Isha' }).click(); await p.waitForTimeout(700);
+  ok(!chips.includes('Fajr') && chips[0] === 'Zuhar', `expanding shows what's left, starting with the next item (${chips.slice(0, 3).join(', ')})`);
+  await p.getByLabel('Still to do').getByRole('button', { name: 'Isha', exact: true }).click(); await p.waitForTimeout(700);
   const box = await p.locator('#habit-isha').boundingBox();
   ok(box && box.y > 0 && box.y < 874, 'tapping an item scrolls to it');
 });

@@ -95,10 +95,10 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className={`bg-slate-900/95 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-md px-4 pt-[max(env(safe-area-inset-top),12px)] transition-[padding] ${scrolled ? 'pb-1' : 'pb-2'}`}>
+    <header className={`bg-slate-900/95 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-md px-4 pt-[max(env(safe-area-inset-top),8px)] transition-[padding] ${scrolled ? 'pb-1' : 'pb-1.5'}`}>
       <div className="max-w-7xl mx-auto">
         {/* Row 1: template title (doubles as switcher) + tabs (tablet/desktop) + actions */}
-        <div className={`flex items-center gap-2 transition-[height] ${scrolled ? 'h-9' : 'h-11'}`}>
+        <div className={`flex items-center gap-2 transition-[height] ${scrolled ? 'h-9' : 'h-10'}`}>
           <div className={`hidden sm:flex p-2 rounded-xl border border-slate-700/80 shrink-0 transition-opacity ${templateColor(currentTemplate).bg} ${scrolled ? 'opacity-0 w-0 p-0 overflow-hidden border-0' : ''}`}>
             <TemplateIcon template={currentTemplate} />
           </div>

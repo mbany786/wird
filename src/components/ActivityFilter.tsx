@@ -46,18 +46,18 @@ export const ActivityFilter: React.FC<ActivityFilterProps> = ({ habits, sections
     <div className="flex items-center gap-2">
       {/* Native select sits invisibly over a styled pill: iOS shows its own picker wheel */}
       <div
-        className={`relative flex-1 min-w-0 flex items-center gap-2 h-11 px-3.5 rounded-xl border transition ${
+        className={`relative flex-1 min-w-0 flex items-center gap-1.5 h-9 px-3 rounded-lg border transition ${
           isFiltered ? 'bg-emerald-950/60 border-emerald-700 text-emerald-200' : 'bg-slate-900 border-slate-800 text-slate-200'
         }`}
       >
-        <ListFilter className={`w-4 h-4 shrink-0 ${isFiltered ? 'text-emerald-400' : 'text-slate-400'}`} />
-        <span className="text-[15px] font-medium truncate">{label}</span>
+        <ListFilter className={`w-3.5 h-3.5 shrink-0 ${isFiltered ? 'text-emerald-400' : 'text-slate-400'}`} />
+        <span className="text-[13px] font-medium truncate">{label}</span>
         {isFiltered && (
           <span className="text-[13px] text-emerald-400/80 tabular-nums shrink-0">
             {visibleCount} of {habits.length}
           </span>
         )}
-        <ChevronDown className="w-4 h-4 text-slate-400 ml-auto shrink-0" />
+        <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-auto shrink-0" />
         <select
           aria-label="Filter activities"
           value={value}
@@ -88,10 +88,10 @@ export const ActivityFilter: React.FC<ActivityFilterProps> = ({ habits, sections
         <button
           type="button"
           onClick={() => onChange(ALL_ACTIVITIES)}
-          className="h-11 px-3 rounded-xl bg-slate-900 border border-slate-800 text-[13px] font-semibold text-slate-300 hover:text-slate-100 flex items-center gap-1 shrink-0"
+          className="h-9 px-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[12px] font-semibold text-slate-300 hover:text-slate-100 flex items-center gap-1 shrink-0"
           aria-label="Show all activities"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
           <span>All</span>
         </button>
       )}
