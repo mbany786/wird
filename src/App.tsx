@@ -49,6 +49,7 @@ export const App: React.FC = () => {
   const [hijriOffset, setHijriOffset] = useState<number>(0);
   const [weekStart, setWeekStartState] = useState<number>(1);
   const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark');
+  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>('dark');
   const [textScale, setTextScale] = useState<number>(1);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
@@ -58,6 +59,8 @@ export const App: React.FC = () => {
     setIsSettingsOpen(true);
   }, []);
   const changeWeekStart = (d: number) => { setWeekStart(d); setWeekStartState(d); };
+  // Quick toggle (header menu): always lands on an explicit light/dark, leaving "System" behind.
+  const toggleTheme = useCallback(() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark'), [resolvedTheme]);
 
   // Modals state
   const [cellModalData, setCellModalData] = useState<{
@@ -152,6 +155,7 @@ export const App: React.FC = () => {
     const apply = () => {
       const resolved = theme === 'system' ? (mql.matches ? 'light' : 'dark') : theme;
       document.documentElement.dataset.theme = resolved;
+      setResolvedTheme(resolved);
     };
     apply();
     if (theme === 'system') {
@@ -595,6 +599,8 @@ export const App: React.FC = () => {
         onOpenSettings={openSettings}
         onOpenReset={() => setIsResetOpen(true)}
         onOpenTasbih={() => setTasbih({ date: todayStr() })}
+        resolvedTheme={resolvedTheme}
+        onToggleTheme={toggleTheme}
       />
 
       {/* Main Content Area */}

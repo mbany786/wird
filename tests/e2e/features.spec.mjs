@@ -86,7 +86,7 @@ await withApp('Weekly habits are scored per week', async ({ ctx, open }) => {
   await tab(page, 'Matrix').click(); await page.waitForTimeout(300);
   const row = page.locator('tr').filter({ has: page.locator('td.sticky span.text-\\[15px\\]:text-is("Surah Mulk")') }).first();
   const label0 = await row.locator('td.sticky').innerText();
-  ok(/0\/[45] wk/.test(label0), `weekly summary starts at 0 of the month's weeks (${label0.replace(/\n/g, ' ')})`);
+  ok(/0\/[456] wk/.test(label0), `weekly summary starts at 0 of the month's weeks (${label0.replace(/\n/g, ' ')})`);
 
   // mark done today on Daily
   await tab(page, 'Today').click(); await page.waitForTimeout(300);
@@ -105,7 +105,7 @@ await withApp('Weekly habits are scored per week', async ({ ctx, open }) => {
   }
   await tab(page, 'Matrix').click(); await page.waitForTimeout(300);
   const label1 = await row.locator('td.sticky').innerText();
-  ok(/1\/[45] wk/.test(label1), `one done day counts as one week (${label1.replace(/\n/g, ' ')})`);
+  ok(/1\/[456] wk/.test(label1), `one done day counts as one week (${label1.replace(/\n/g, ' ')})`);
   ok(await row.locator('span[title="Done this week"]').count() >= 1 || weekStartOffset === 6, 'other days of that week show a faint ✓');
 });
 

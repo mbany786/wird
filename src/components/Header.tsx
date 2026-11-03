@@ -15,7 +15,9 @@ import {
   Ellipsis,
   CircleDot,
   Settings,
-  RotateCcw
+  RotateCcw,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 export type AppView = 'matrix' | 'daily' | 'bi' | 'customize';
@@ -38,6 +40,8 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenReset?: () => void;
   onOpenTasbih?: () => void;
+  resolvedTheme: 'dark' | 'light';
+  onToggleTheme: () => void;
 }
 
 export const VIEW_TABS: { id: AppView; label: string; Icon: typeof LayoutGrid }[] = [
@@ -64,7 +68,9 @@ export const Header: React.FC<HeaderProps> = ({
   onManageTemplates,
   onOpenSettings,
   onOpenReset,
-  onOpenTasbih
+  onOpenTasbih,
+  resolvedTheme,
+  onToggleTheme
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -186,6 +192,11 @@ export const Header: React.FC<HeaderProps> = ({
                   />
                   <div className="absolute right-0 top-12 z-50 w-64 rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl p-1.5 text-[15px]">
                     {[
+                      {
+                        label: resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode',
+                        Icon: resolvedTheme === 'dark' ? Sun : Moon,
+                        fn: onToggleTheme
+                      },
                       { label: 'Share as Excel', Icon: FileSpreadsheet, fn: onExportExcel },
                       { label: 'Share monthly chart (PDF)', Icon: Printer, fn: onPrintPDF },
                       { label: 'Email monthly report', Icon: Mail, fn: onEmailReport },
