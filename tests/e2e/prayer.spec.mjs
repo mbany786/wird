@@ -1,5 +1,5 @@
 import * as adhan from 'adhan';
-import { withApp, ok, summary, tab, openMenu, openPrayerSettings } from './harness.mjs';
+import { withApp, ok, summary, tab, openPrayerSettings, closeSheet } from './harness.mjs';
 
 const startFresh = async (p) => { const b = p.getByRole('button', { name: 'Start fresh' }); if (await b.count()) await b.click(); };
 const sheet = (p) => p.locator('[role="dialog"]').last();
@@ -21,8 +21,9 @@ await withApp('Prayer times: city, method, Asr, logging, persistence', async ({ 
   const p = await open(ctx);
   await startFresh(p);
   await tab(p, 'Today').click(); await p.waitForTimeout(300);
-  ok(await p.getByText("Set your location to see today's times").isVisible(), 'Daily invites prayer-time setup');
-  await p.getByRole('button', { name: 'Set up' }).click(); await p.waitForTimeout(200);
+  ok(!(await p.getByText("Set your location to see today's times").count()), 'Daily tab has no prayer-setup prompt (lives in Settings instead)');
+  await openPrayerSettings(p);
+  ok(await sheet(p).getByLabel('Search city').isVisible(), 'prayer setup is reachable from Settings');
   await sheet(p).getByLabel('Search city').fill('princ');
   await sheet(p).getByRole('button', { name: /Princeton, NJ/ }).click(); await p.waitForTimeout(200);
   ok(await sheet(p).getByLabel('Method').inputValue() === 'NorthAmerica', 'city picks its usual method (ISNA)');
@@ -33,7 +34,7 @@ await withApp('Prayer times: city, method, Asr, logging, persistence', async ({ 
   await sheet(p).getByRole('radio', { name: /Hanafi/ }).click(); await p.waitForTimeout(100);
   const asrHan = await sheet(p).getByTestId('preview-asr').innerText();
   ok(asrHan === expected(40.36, -74.67, 'NorthAmerica', true, 'America/New_York').asr && asrHan !== asrStd, `Hanafi Asr is later (${asrStd} → ${asrHan})`);
-  await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+  await closeSheet(p); // closes Prayer settings, then Settings underneath it
 
   ok(await p.getByTestId('time-isha').innerText() === exp.isha, 'Daily card shows the times');
   await p.getByRole('button', { name: 'Log Fajr' }).click();

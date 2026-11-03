@@ -172,8 +172,9 @@ export const DailyRoutineView: React.FC<DailyRoutineViewProps> = ({
       </div>
       </div>
 
-      {/* Prayer times with one-tap logging */}
-      {prayerConfig && templateHasPrayers(habits) && (
+      {/* Prayer times with one-tap logging. Only once a location is set — otherwise this would just
+          repeat the "Set up" prompt that already lives in Settings > Tracking > Prayer times & reminders. */}
+      {prayerConfig?.location && templateHasPrayers(habits) && (
         <PrayerTimesCard
           config={prayerConfig}
           dateStr={selectedDate}
