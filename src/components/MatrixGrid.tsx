@@ -1474,9 +1474,9 @@ export const MatrixGrid: React.FC<MatrixGridProps> = ({
                   <div className="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800">
                     <div className="flex items-center gap-2">
                       <span className="text-rose-400 font-semibold">✗</span>
-                      <span className="text-slate-200 font-medium">Relapse / Distraction Trap</span>
+                      <span className="text-slate-200 font-medium">Slipped / Gave in to the distraction</span>
                     </div>
-                    <span className="text-rose-400 text-[11px] font-semibold">Penalty</span>
+                    <span className="text-rose-400 text-[11px] font-semibold">Streak resets</span>
                   </div>
                   <div className="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800">
                     <div className="flex items-center gap-2">

@@ -18,6 +18,20 @@ import {
 } from 'lucide-react';
 import { LongTermAnalytics } from './LongTermAnalytics';
 import { todayStr as localToday } from '../utils/date';
+
+/** Plain-language read of a Pearson r so the raw statistic isn't the only thing shown.
+ * r can be negative (the habits tend NOT to happen together) — the UI must say so, not just
+ * flip it positive, or a genuine inverse relationship reads as a false "catalyst". */
+function describeCorrelation(r: number): { strength: string; tone: 'positive' | 'negative'; sentence: (a: string, b: string) => string } {
+  const abs = Math.abs(r);
+  const strength = abs >= 0.5 ? 'Strong' : abs >= 0.3 ? 'Moderate' : 'Weak';
+  const tone: 'positive' | 'negative' = r >= 0 ? 'positive' : 'negative';
+  const sentence = (a: string, b: string) =>
+    tone === 'positive'
+      ? `Days you do ${a} tend to also include ${b}.`
+      : `Days you do ${a} tend to skip ${b}, and the other way around.`;
+  return { strength, tone, sentence };
+}
 import { analyzeMenstrualCycle } from '../utils/cycleEngine';
 
 interface BiAnalyticsDashboardProps {
@@ -402,21 +416,25 @@ export const BiAnalyticsDashboard: React.FC<BiAnalyticsDashboardProps> = ({
 
             <div className="space-y-2">
               {correlations.length > 0 ? (
-                correlations.slice(0, 4).map((c, idx) => (
-                  <div key={idx} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1">
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span className="font-semibold truncate max-w-[150px]">{c.habitA}</span>
-                      <span className="text-slate-500 tabular-nums">⟷</span>
-                      <span className="font-semibold truncate max-w-[150px]">{c.habitB}</span>
+                correlations.slice(0, 4).map((c, idx) => {
+                  const { strength, tone, sentence } = describeCorrelation(c.score);
+                  return (
+                    <div key={idx} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="font-semibold truncate max-w-[150px]">{c.habitA}</span>
+                        <span className="text-slate-500 tabular-nums">{tone === 'positive' ? '⟷' : '⇎'}</span>
+                        <span className="font-semibold truncate max-w-[150px]">{c.habitB}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">{sentence(c.habitA, c.habitB)}</p>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500">
+                        <span>r =</span>
+                        <span className={`tabular-nums font-semibold ${tone === 'positive' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          {c.score > 0 ? '+' : ''}{c.score} ({strength}, {tone === 'positive' ? 'together' : 'opposite'})
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-400">
-                      <span>Pearson Correlation (r):</span>
-                      <span className={`tabular-nums font-semibold ${c.score > 0.5 ? 'text-emerald-400' : 'text-sky-400'}`}>
-                        +{c.score} (Strong Catalyst)
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-xs text-slate-500 italic p-3 text-center bg-slate-950 rounded-xl">
                   Log at least 5 days of data across multiple habits to reveal correlation patterns.

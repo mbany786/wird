@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { Habit, HabitSection, HabitLog, TrackerTemplate } from '../types';
 import { calculateMonthSummary } from './analytics';
 import { getHijriDate } from './hijri';
@@ -15,6 +14,9 @@ export async function downloadExcel(
   showHijri: boolean = false,
   hijriOffset: number = 0
 ) {
+  // Loaded on demand (not at app startup) — xlsx is a large library only needed when the
+  // user actually exports, same pattern already used for jsPDF in monthChart.ts.
+  const XLSX = await import('xlsx');
   const [year, month] = currentMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
 
